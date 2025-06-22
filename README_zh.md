@@ -7,8 +7,10 @@
 <div align="center" style="font-size: 15pt">
 
 <a href='https://arxiv.org'><img src='https://img.shields.io/badge/Paper-PDF-purple'></a>
-<a href='https://huggingface.co/datasets'><img src='https://img.shields.io/badge/Dataset-HF-Green'></a>
-<a href='https://huggingface.co'><img src='https://img.shields.io/badge/Model-7B-orange'></a>
+<a href='https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset'><img src='https://img.shields.io/badge/Dataset-Train-Green'></a>
+<a href='https://huggingface.co/openbmb/RLPR-Qwen2.5-7B-Base'><img src='https://img.shields.io/badge/Model-Qwen2.5_7B-orange'></a>
+<a href='https://huggingface.co/openbmb/RLPR-Gemma2-2B-it'><img src='https://img.shields.io/badge/Model-Gemma2_2B-orange'></a>
+<a href='https://huggingface.co/openbmb/RLPR-Llama3.1-8B-Inst'><img src='https://img.shields.io/badge/Model-Llama31_8B-orange'></a>
 
 <h4 align="center">
     <p>
@@ -20,7 +22,7 @@
 
 ## 🎊 更新日志 <!-- omit in toc -->
 
-- [2025.06.23] 我们开源了 RLPR 的代码、[权重](https://huggingface.co)和[数据](https://huggingface.co/datasets)！
+- [2025.06.23] 我们开源了 RLPR 的代码、[权重](https://huggingface.co/openbmb/RLPR-Qwen2.5-7B-Base)和[数据](https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset)！
 
 ## 📜 简介 <!-- omit in toc -->
 
@@ -54,7 +56,7 @@
 
 ## 数据集
 
-我们提供了 [RLPR 训练数据集](https://huggingface.co/) 和 [评估基准](https://huggingface.co/) 以方便使用。
+我们提供了 [RLPR 训练数据集](https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset) 和 [评估基准](https://huggingface.co/datasets/openbmb/RLPR-Evaluation) 以方便使用。
 
 ## 安装
 

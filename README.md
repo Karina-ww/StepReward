@@ -7,8 +7,10 @@
 <div align="center" style="font-size: 15pt">
 
 <a href='https://arxiv.org'><img src='https://img.shields.io/badge/Paper-PDF-purple'></a>
-<a href='https://huggingface.co/datasets'><img src='https://img.shields.io/badge/Dataset-HF-Green'></a>
-<a href='https://huggingface.co'><img src='https://img.shields.io/badge/Model-7B-orange'></a>
+<a href='https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset'><img src='https://img.shields.io/badge/Dataset-Train-Green'></a>
+<a href='https://huggingface.co/openbmb/RLPR-Qwen2.5-7B-Base'><img src='https://img.shields.io/badge/Model-Qwen2.5_7B-orange'></a>
+<a href='https://huggingface.co/openbmb/RLPR-Gemma2-2B-it'><img src='https://img.shields.io/badge/Model-Gemma2_2B-orange'></a>
+<a href='https://huggingface.co/openbmb/RLPR-Llama3.1-8B-Inst'><img src='https://img.shields.io/badge/Model-Llama31_8B-orange'></a>
 
 <h4 align="center">
     <p>
@@ -21,7 +23,7 @@
 
 ## 🎊 News <!-- omit in toc -->
 
-- [2025.06.23] We open-source the code, [weights](https://huggingface.co) and [data](https://huggingface.co/datasets) of RLPR!
+- [2025.06.23] We open-source the code, [weights](https://huggingface.co/openbmb/RLPR-Qwen2.5-7B-Base) and [data](https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset) of RLPR!
 
 
 ## 📜 Brief Introduction <!-- omit in toc -->
@@ -56,7 +58,7 @@ We introduce the RLPR (Reinforcement Learning with Reference Probability Reward)
 
 ## Dataset
 
-We present the [RLPR Train Dataset](https://huggingface.co/) and [evaluation benchmarks](https://huggingface.co/) for easier usage.
+We present the [RLPR Train Dataset](https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset) and [evaluation benchmarks](https://huggingface.co/datasets/openbmb/RLPR-Evaluation) for easier usage. 
 
 ## Install
 
