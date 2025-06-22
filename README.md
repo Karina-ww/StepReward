@@ -68,7 +68,7 @@ cd RLPR
 
 2. Install package
 ```bash
-bash setup_env.sh
+bash scripts/setup_env.sh
 ```
 
 <!-- ## Model Weights 
@@ -104,7 +104,7 @@ USE_WANDB=${USE_WANDB:-"false"}
 	    1. Create a new environment for the server and deploy the model. (Specify judge model, host and port in the `setup_server.sh`)
 	        
 	        ```shell
-	        bash setup_server.sh
+	        bash scripts/setup_server.sh
 	        ```
 	        
 	    2. Specify the judge model in the `examples/RLPR/reproduce.sh`.

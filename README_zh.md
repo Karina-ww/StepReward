@@ -79,7 +79,11 @@
 
 1.  准备数据
 
-    下载[训练](https://huggingface.co/)和[测试](https://huggingface.co/)数据集。将 `rlpr_train.parquet` 移动到 `./datasets/train` 目录下，并将所有测试数据集移动到 `./datasets/test` 目录下。
+    下载[训练](https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset)和[测试](https://huggingface.co/datasets/openbmb/RLPR-Evaluation)数据集。将 `rlpr_train.parquet` 移动到 `./datasets/train` 目录下，并将所有测试数据集移动到 `./datasets/test` 目录下。
+    ```bash
+    huggingface-cli download --repo-type dataset --resume-download openbmb/RLPR-Train-Dataset --local-dir ./datasets/train
+    huggingface-cli download --repo-type dataset --resume-download openbmb/RLPR-Evaluation --local-dir ./datasets/test
+    ```
 
 2.  在 `examples/RLPR/reproduce.sh` 中指定基座模型路径。
     ```bash
@@ -97,7 +101,7 @@
         1.  创建一个新环境并用其部署模型。(在 `setup_server.sh` 中指定评估模型、主机和端口)
 
             ```shell
-            bash setup_server.sh
+            bash scripts/setup_server.sh
             ```
 
         2.  在 `examples/RLPR/reproduce.sh` 中指定评估模型。
