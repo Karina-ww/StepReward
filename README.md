@@ -1,6 +1,6 @@
 <div align="center">
 
-# RLPR: Extrapolating RLVR To General Domain
+# RLPR: Extrapolating RLVR To General Domains
 
 </div>
 
@@ -49,7 +49,7 @@ We introduce the RLPR (Reinforcement Learning with Reference Probability Reward)
 
 ## ðŸ“ŒContents <!-- omit in toc -->
 
-- [RLPR: Extrapolating RLVR To General Domain](#rlpr-extrapolating-rlvr-to-general-domain)
+- [RLPR: Extrapolating RLVR To General Domains](#rlpr-extrapolating-rlvr-to-general-domains)
   - [Dataset](#dataset)
   - [Install](#install)
   - [Train](#train)
@@ -162,7 +162,7 @@ If you find our model/code/data/paper helpful, please consider cite our papers ð
 
 ```bibtex
 @article{yu2025rlpr,
-  title={RLPR: Extrapolating RLVR to General Domain without Verifiers},
+  title={RLPR: Extrapolating RLVR to General Domains without Verifiers},
   author={Yu, Tianyu and Ji, Bo and Wang, Shouli and Yao, Shu and Wang, Zefan and Cui, Ganqu and Yuan, Lifan and Ding, Ning and Yao, Yuan and Liu, Zhiyuan and Sun, Maosong and Chua, Tat-Seng},
   journal={arXiv preprint arXiv:2506.xxxxx},
   year={2025}
