@@ -41,9 +41,9 @@ We introduce the RLPR (Reinforcement Learning with Reference Probability Reward)
 * 🚀 **Better Reward Quality and Robust Training**.
     PR exhibits better reward quality compared with rule-based, model-based reward, and naive likelihood as a reward. We apply RLPR with different training prompt templates and find it achieves robustness reasoning capability enhancement.
 
-<div align="center"> <img src="assets/PR_quality.png" width = 50% /> </div>
-
 <div align="center"> <img src="assets/robustness.png" width = 80% /> </div>
+
+<div align="center"> <img src="assets/PR_quality.png" width = 50% /> </div>
 
 ## 📌Contents <!-- omit in toc -->
 

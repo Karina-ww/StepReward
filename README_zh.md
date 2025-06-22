@@ -39,9 +39,9 @@
 * 🚀 **更高的奖励质量和稳健的训练效果**。
     与基于规则、基于模型的奖励以及朴素似然作为奖励相比，PR展现出更高的奖励质量。我们将 RLPR 应用于不同的训练提示模板，发现它均能实现稳健的推理能力增强。
 
-<div align="center"> <img src="assets/PR_quality.png" width = 50% /> </div>
-
 <div align="center"> <img src="assets/robustness.png" width = 80% /> </div>
+
+<div align="center"> <img src="assets/PR_quality.png" width = 50% /> </div>
 
 ## 📌 目录 <!-- omit in toc -->
 
