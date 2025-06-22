@@ -249,7 +249,6 @@ class ProbRewardManager:
                     num_bins = int(self.discrete_function_name.split('_')[1])
                     score_delta = self.map_to_bins(score_delta, num_bins)
 
-            # reward_tensor[i, valid_response_length - 1] = score
             if self.format_coefficient == -1:
                 score = score_delta if format_score == 1 else -1
             else:

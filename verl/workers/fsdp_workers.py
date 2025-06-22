@@ -554,7 +554,7 @@ class ActorRolloutRefWorker(Worker):
 
         # clear kv cache
         torch.cuda.empty_cache() # remove 1
-        log_gpu_memory_usage('After compute_log_prob', logger=logger)
+        log_gpu_memory_usage('After compute_log_prob_prob', logger=logger)
         return output
  
 

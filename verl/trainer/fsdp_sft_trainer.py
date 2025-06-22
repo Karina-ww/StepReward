@@ -468,8 +468,6 @@ class FSDPSFTTrainer(object):
         self.total_training_steps = total_training_steps
         print(f'Total training steps: {self.total_training_steps}')
 
-        # TODO (zhangchi.usc1992) add back checkpoint manager. Currently, it blocks when uploading to hdfs. So very slow.
-
         for epoch in range(self.config.trainer.total_epochs):
             self.train_sampler.set_epoch(epoch=epoch)
             for data in tqdm(self.train_dataloader,

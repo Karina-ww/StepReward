@@ -31,8 +31,6 @@ import math
 from . import math_normalize
 from .grader import math_equal
 
-# import math_normalize
-# from grader import math_equal
 
 # sympy might hang -- we don't care about trying to be lenient in these cases
 BAD_SUBSTRINGS = ["^{", "^("]
@@ -382,37 +380,13 @@ def match_answer(response):
 
 
 
-# def cross_entropy_score(log_probs, labels):
-#     # Ensure log_probs and labels are PyTorch tensors
-#     # log_probs = torch.tensor(log_probs, dtype=torch.float32)
-#     # labels = torch.tensor(labels, dtype=torch.long)
-    
-#     # Compute the cross-entropy loss
-#     loss = F.cross_entropy(log_probs, labels)
-    
-#     # Normalize the loss to a score between 0 and 1
-#     score = torch.exp(-loss).item()
-    
-#     return score
-
 def cross_entropy_score(log_probs, labels):
-    # Convert labels to one-hot encoded format
-    # print(f"log_probs.shape: {log_probs.shape}") # (10, 152064)
-    # print(f"log_probs: {log_probs}")
-    # print(f"labels: {labels}") # [18, 15, 11, 220, 16, 15, 11, 220, 19, 15]
-
-    # num_classes = log_probs.shape[1]
-    # one_hot_labels = np.eye(num_classes)[labels]
     log_probs_true = log_probs[np.arange(len(labels)), labels]
     
-    # Compute the cross-entropy loss
-    # print(f"one_hot_labels * log_probs: {one_hot_labels * log_probs}")
-    # loss = -np.sum(one_hot_labels * log_probs) / len(labels)
     loss = -np.sum(log_probs_true) / len(labels)
-    # print(f"loss: {loss}")
     
     # Normalize the loss to a score between 0 and 1
-    score = np.exp(-loss) # -1.0 --> 2.718281828459045
+    score = np.exp(-loss) 
     
     return score
 
@@ -427,86 +401,31 @@ def compute_score(model_output: str, ground_truth: str, extra_info) -> bool:
     model_output = str(model_output)
     ground_truth = str(ground_truth)
 
-    # extracted_answer = _last_boxed_only_string(model_output)
     if extracted_answer is None:
         return 0
     tokenizer = extra_info['tokenizer']
     extracted_answer_ids = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(extracted_answer))
-    # print(f"extracted_answer: {extracted_answer}") # 10, 30, 40
-    # print(f"extracted_answer_ids: {extracted_answer_ids}") # [16, 15, 11, 220, 18, 15, 11, 220, 19, 15]
-
-    # model_output_ids = tokenizer.tokenize(model_output)
-    # print(f"model_output: {model_output}") # <|im_start|>system\n ... the answer is: \boxed{10, 30, 40}<|im_end|>
-    # print(f"model_output_ids: {len(model_output_ids)} {model_output_ids}") # 485; ['<|im_start|>', 'system', ..., ':', 'Ġ\\', 'boxed', '{', '1', '0', ',', 'Ġ', '3', '0', ',', 'Ġ', '4', '0', '}', '<|im_end|>']
 
 
     ground_truth_ids = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(ground_truth)) # type: list
-    # print(f"ground_truth_ids: {ground_truth_ids}") # [18, 15, 11, 220, 16, 15, 11, 220, 19, 15]
     if len(extracted_answer_ids) != len(ground_truth_ids): # Incorrect format
         return 0
-
-    # valid_old_log_probs = extra_info['valid_old_log_probs']
-    # print(f"len(valid_old_log_probs): {len(valid_old_log_probs)}") # 329
+    
     valid_response_ids = extra_info['valid_response_ids'].to('cpu').numpy().tolist()
-    # print(f"len(valid_response_ids): {len(valid_response_ids)}") # 329
-    # sequences = extra_info['sequences']
-    # print(f'sequences: {sequences}') # tensor([151644,   8948,    271,   4498,  56811,   6351, ..., 15,     92, 151645])
-
-    # valid_all_old_logits = extra_info['valid_all_old_logits']
-    # print("-"*50)
-    # print(f"valid_all_old_logits: {valid_all_old_logits}")
-    # print(f"valid_all_old_logits.device: {valid_all_old_logits.device}")
-    # print(f"valid_all_old_logits.shape: {valid_all_old_logits.shape}")
-    # print("-"*50)
 
     # find the corresponding old_log_probs
     start_i = None
-    # sequences[0:0+len(extracted_answer_ids)]: tensor([151644,   8948,    271,   4498,  56811,   6351,  32711, 9079, 11,498])
     for i in range(len(valid_response_ids) - len(extracted_answer_ids), -1, -1):
-        # print(valid_response_ids[i:i+len(extracted_answer_ids)], extracted_answer_ids)
         if valid_response_ids[i:i+len(extracted_answer_ids)] == extracted_answer_ids:
             start_i = i
     if start_i is None:
         return 0
-    # print(f"sequences[start_i:start_i+len(extracted_answer_ids)]: {valid_response_ids[start_i:start_i+len(extracted_answer_ids)]}")
-    # print(f"start_i: {start_i}")
     target_all_old_logits = valid_all_old_logits[start_i: start_i + len(extracted_answer_ids)]
-    # print(f"target_all_old_logits: {target_all_old_logits.shape} {target_all_old_logits}") # torch.Size([10, 152064])
-    # print(f"valid_response_ids: {len(valid_response_ids)} || {valid_response_ids}") # 329
-    # print(f"valid_response_ids[start_i: len(extracted_answer_ids)]: {valid_response_ids[start_i: start_i + len(extracted_answer_ids)]}") # [16, 15, 11, 220, 18, 15, 11, 220, 19, 15]
-    # print(f"target output: {tokenizer.decode(valid_response_ids[start_i: start_i + len(extracted_answer_ids)])}") # 10, 30, 40
-    # print(f"target gt: {tokenizer.decode(ground_truth_ids)}") # 30, 10, 40
-    # score = loss_fct(target_old_log_probs, ground_truth_ids)
-
-    # print(f"target_all_old_logits.shape: {target_all_old_logits.shape}") # torch.Size([10, 152064])
 
     target_all_old_logits = target_all_old_logits.to('cpu').float().numpy()
 
-    # log_softmax_values = log_softmax(target_all_old_logits)
     log_softmax_values = softmax(target_all_old_logits)
     score = cross_entropy_score(log_softmax_values, ground_truth_ids)
-    # print(f"Do we need to shift the logits and labels?") # No, as long as the result match, we give high score
-    # print(f"score: {score}")
     return score
 
 
-
-    # is_matched, extracted_model_output = match_answer(model_output)
-    # format_correctness = "Step 2:" in model_output and "\\box" in model_output
-
-    # # grade simple algebra questions. if succeeded, return; otherwise, proceed to more complex grading
-    # if grade_answer(extracted_model_output, ground_truth):
-    #     return True, True, extracted_model_output
-
-    # try:
-    #     if "\pi" in extracted_model_output or "\pi" in ground_truth:
-    #         equivs = []
-    #         for pi in [math.pi, 3.14]:
-    #             equivs.append(math_equal(extracted_model_output, ground_truth, timeout=True, pi=pi))
-    #         is_correct = any(equivs)
-    #     else:
-    #         is_correct = math_equal(extracted_model_output, ground_truth, timeout=True)
-    # except:
-    #     is_correct = False
-
-    # return is_correct, format_correctness, extracted_model_output

@@ -229,19 +229,11 @@ def compute_prnostd_vrstd_outcome_advantage(token_level_pr: torch.Tensor, token_
             if debug:
                 print(f"{i=} {index[i]=} {pr_scores[i].dtype} {vr_scores[i].item()=} {vr_scores[i].dtype} {vr_scores[i].item()=} {id2pr_mean[index[i]].item()=} {id2vr_mean[index[i]].item()=} {id2vr_std[index[i]].item()=} {epsilon=}")
                 print(f"{__file__} {i=} {std_filter=} {id2vr_std[index[i]]=}")
-            # if id2vr_std[index[i]] < std_filter: # avoid the case when all correct or all wrong
-                # filtered_count += 1
-                # final_scores[i] = 0
-            # else:
             final_scores[i] = pr_weight * (pr_scores[i] - id2pr_mean[index[i]]) + vr_weight * (vr_scores[i] - id2vr_mean[index[i]]) / (id2vr_std[index[i]] + epsilon)
             if debug:
                 print(f"{i=} {index[i]=} {final_scores[i].dtype} {final_scores[i].item()=}")
             vr_stds[i] = id2vr_std[index[i]]
         final_scores = final_scores.unsqueeze(-1).tile([1, response_length]) * eos_mask
-
-        # Calculate filter rate
-        # filter_rate = filtered_count / bsz
-        # stds = stds.unsqueeze(-1).tile([1, response_length]) * eos_mask
 
     return final_scores, final_scores, -1, vr_stds
 
@@ -296,20 +288,12 @@ def compute_prstd_vrstd_outcome_advantage(token_level_pr: torch.Tensor, token_le
             if debug:
                 print(f"{i=} {index[i]=} {pr_scores[i].dtype} {vr_scores[i].item()=} {vr_scores[i].dtype} {vr_scores[i].item()=} {id2pr_mean[index[i]].item()=} {id2pr_std[index[i]].item()=} {id2vr_mean[index[i]].item()=} {id2vr_std[index[i]].item()=} {epsilon=}")
                 print(f"{__file__} {i=} {std_filter=} {id2pr_std[index[i]]=} {id2vr_std[index[i]]=}")
-            # if id2vr_std[index[i]] < std_filter: # avoid the case when all correct or all wrong
-                # filtered_count += 1
-                # final_scores[i] = 0
-            # else:
             final_scores[i] = pr_weight * (pr_scores[i] - id2pr_mean[index[i]]) / (id2pr_std[index[i]] + epsilon) +  vr_weight * (vr_scores[i] - id2vr_mean[index[i]]) / (id2vr_std[index[i]] + epsilon)
             if debug:
                 print(f"{i=} {index[i]=} {final_scores[i].dtype} {final_scores[i].item()=}")
             pr_stds[i] = id2pr_std[index[i]]
             vr_stds[i] = id2vr_std[index[i]]
         final_scores = final_scores.unsqueeze(-1).tile([1, response_length]) * eos_mask
-
-        # Calculate filter rate
-        # filter_rate = filtered_count / bsz
-        # stds = stds.unsqueeze(-1).tile([1, response_length]) * eos_mask
 
     return final_scores, final_scores, -1, pr_stds, vr_stds
 
@@ -407,10 +391,8 @@ def compute_grpo_nostd_outcome_advantage_old(token_level_rewards: torch.Tensor,
         for idx in id2score:
             if len(id2score[idx]) == 1:
                 id2mean[idx] = torch.tensor(0.0)
-                # id2std[idx] = torch.tensor(1.0)
             elif len(id2score[idx]) > 1:
                 id2mean[idx] = torch.mean(torch.tensor(id2score[idx]))
-                # id2std[idx] = torch.std(torch.tensor([id2score[idx]]))
             else:
                 raise ValueError(f"no score in prompt index: {idx}")
         for i in range(bsz):
@@ -591,10 +573,8 @@ def compute_policy_loss(old_log_prob, log_prob, advantages, eos_mask, cliprange,
         cliprange_low, cliprange_high = cliprange
     else:
         cliprange_low, cliprange_high = cliprange, cliprange
-    # pg_losses2 = -advantages * torch.clamp(ratio, 1.0 - cliprange, 1.0 + cliprange)
     pg_losses2 = -advantages * torch.clamp(ratio, 1.0 - cliprange_low, 1.0 + cliprange_high)
 
-    # pg_loss = verl_F.masked_mean(torch.max(pg_losses, pg_losses2), eos_mask)
     pg_loss = agg_loss(torch.max(pg_losses, pg_losses2), eos_mask, loss_agg_mode=loss_agg_mode, max_tokens=max_tokens)
     pg_clipfrac = verl_F.masked_mean(torch.gt(pg_losses2, pg_losses).float(), eos_mask)
     return pg_loss, pg_clipfrac, ppo_kl

@@ -34,14 +34,6 @@ class NaiveRewardManager:
     def __call__(self, data: DataProto, name=None):
         """We will expand this function gradually based on the available datasets"""
 
-        # import debugpy
-        # try:
-            # debugpy.listen(("localhost", 3000))
-            # print("Waiting for debugger attach")
-            # debugpy.wait_for_client()
-        # except Exception as e:
-            # pass
-
         # If there is rm score, we directly return rm score. Otherwise, we compute via rm_score_fn
         if 'rm_scores' in data.batch.keys():
             return data.batch['rm_scores']
@@ -105,7 +97,6 @@ class NaiveRewardManager:
             pool.join()
 
         for (result, i, data_source, sequences_str, ground_truth) in result_list:
-            # acc, format_score, extracted_answer, from_judge, judge_response, judge_prompt = result.get()
             acc, format_score, extracted_answer, from_judge, judge_response = result.get()
             score = 0.9 * acc + 0.1 * format_score
             reward_tensor[i, valid_response_length - 1] = score

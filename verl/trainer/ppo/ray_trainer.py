@@ -1560,7 +1560,6 @@ class RayPPOTrainer(object):
                             ema_mean = self.config.data.get('resume_ema_mean', None)
                             if ema_mean is not None:
                                 print(f"We resume the ema_mean as {ema_mean=}")
-                                # self.config.data.resume_ema_mean = None
                         if self.global_steps >= self.config.data.filter_ema_start_step:
                             if self.global_steps >= self.config.data.filter_start_step:
                                 print(f"We are calculating the score_std_list using EMA: {self.global_steps=} {len(score_std_list)=} {score_std_list=}")

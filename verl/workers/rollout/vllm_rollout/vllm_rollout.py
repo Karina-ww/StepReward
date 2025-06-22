@@ -176,21 +176,10 @@ class vLLMRollout(BaseRollout):
                 'n': 1  # if greedy, only 1 response
             }
         if prompts.meta_info.get('validate', False):
-            # self.sampling_params=SamplingParams(n=5, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=1.0, top_p=1, to
-            # p_k=-1, min_p=0.0, seed=None, stop=[], stop_token_ids=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=3072, min_tokens=0, logprobs=1, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True
-            # , truncate_prompt_tokens=None)
-            # kwargs.update({'n': 1, 'seed': 42})
-            # kwargs.update({'n': prompts.meta_info.get('n', 1),'seed': 42})
             kwargs.update({'n': prompts.meta_info.get('n', 1),'seed': prompts.meta_info.get('seed', 42)})
 
         # users can customize different sampling_params at different run
         with self.update_sampling_params(**kwargs):
-            if prompts.meta_info.get('validate', False):
-                print(f"{__file__} {kwargs=}", flush=True)
-                print(f"{__file__} {self.sampling_params=}", flush=True) # self.sampling_params=SamplingParams(n=5, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=1.0, top_p=1, top_k=-1, min_p=0.0, seed=None, stop=[], stop_token_ids=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=4096, min_tokens=0, logprobs=1, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None), guided_decoding=None
-                print(f"{len(idx_list)=}")
-                # print(f"{batch_size=}", flush=True) # When do_sample is True: 1k sampels ,but the batch size is 442?
-                # print(f"{idx.shape=}", flush=True)
             output = self.inference_engine.generate(
                 prompts=None,  # because we have already convert it to prompt token id
                 sampling_params=self.sampling_params,
@@ -242,7 +231,6 @@ class vLLMRollout(BaseRollout):
                 'prompts': idx,
                 'responses': response,
                 'input_ids': seq,  # here input_ids become the whole sentences
-                # 'old_log_probs': log_probs, # we will recompute old log prob with actor
                 'attention_mask': attention_mask,
                 'position_ids': position_ids
             },
