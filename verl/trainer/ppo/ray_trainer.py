@@ -524,6 +524,7 @@ class RayPPOTrainer(object):
             raise NotImplementedError
 
         self._validate_config()
+        self._create_dataset_for_llama_and_gemma()
         self._create_dataloader()
 
     def _validate_config(self):
@@ -610,9 +611,37 @@ class RayPPOTrainer(object):
 
         print("[validate_config] All configuration checks passed successfully!")
 
+    def _create_dataset_for_llama_and_gemma(self):
+        # We create datasets for Llama and Gemma
+        if any(text in self.config.actor_rollout_ref.model.path.lower() for text in ['llama', 'gemma']):
+            # llama/gemma tokenizer does not support truncation, so we use 'error' to raise error when the prompt is too long
+            # for files in [eval(self.config.data.train_files), eval(self.config.data.val_files)]:
+            self.config.data.train_files = self.config.data.train_files if isinstance(self.config.data.train_files, (List, ListConfig)) else [self.config.data.train_files]
+            self.config.data.val_files = self.config.data.val_files if isinstance(self.config.data.val_files, (List, ListConfig)) else [self.config.data.val_files]
+            for files in [self.config.data.train_files, self.config.data.val_files]:
+                for fn in files:
+                    df = pd.read_parquet(fn)
+                    def modify_prompt(row):
+                        row = row[1:] # remove system prompt
+                        row[0]['content'] = row[0]['content'] + "\nPlease reason step by step, and put your final answer within <answer> </answer>."
+                        if any(text in fn for text in ['MMLUPro', 'gpqa_diamond', 'WebInstruct-verified', 'SuperGPQA']):
+                            row[0]['content'] = row[0]['content'] + '\nPlease only provide the letter of the answer in the tags.'
+                        return row
+                    df['prompt'] = df['prompt'].apply(modify_prompt)
+                    save_path = fn.replace('/test/', '/test_llama_and_gemma/') if 'test' in fn else fn.replace('/train/', '/train_llama_and_gemma/')
+                    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                    assert save_path != fn, f"{save_path=} {fn=}"
+                    print(f"Saving modified prompts to {save_path}")
+                    df.to_parquet(save_path, index=False)
+            self.config.data.train_files = [file.replace('/train/', '/train_llama_and_gemma/') for file in self.config.data.train_files if file is not None]
+            self.config.data.val_files = [file.replace('/test/', '/test_llama_and_gemma/') for file in self.config.data.val_files if file is not None]
+
+
     def _create_dataloader(self):
         from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
         # TODO: we have to make sure the batch size is divisible by the dp size
+
+
         self.train_dataset = RLHFDataset(parquet_files=self.config.data.train_files,
                                          tokenizer=self.tokenizer,
                                          prompt_key=self.config.data.prompt_key,
@@ -938,8 +967,8 @@ class RayPPOTrainer(object):
         plt.close()
 
         
-        # Save histogram to ./data/logs/val_results
-        save_dir = "./data/logs/val_results"
+        # Save histogram to data/logs/val_results
+        save_dir = "data/logs/val_results"
         os.makedirs(save_dir, exist_ok=True)
         os.makedirs(os.path.join(save_dir, histogram_name.split('/')[0]), exist_ok=True)
         
@@ -968,9 +997,6 @@ class RayPPOTrainer(object):
             result.update(result_greedy)
         if 'sampling' in test_decoding_strategy and 'greedy' in test_decoding_strategy:
             for data_source_set in [
-                ['AIME2024', 'AIME2025', 'AMC2023', 'Math-500', 'gpqa_diamond', 'mmlu_pro-test-1000', 'WebInstruct-verified-val'], # for the old version
-                ['Math-500', 'gpqa_diamond', 'mmlu_pro-test-1000'], # for the old version
-                
                 ['AIME2024-avg16', 'AIME2025-avg16', 'AMC2023-avg16', 'Math-500-avg2', 'gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2', 'WebInstruct-verified-val-avg2'],
                 ['AIME2024-avg16', 'AIME2025-avg16', 'AMC2023-avg16', 'Math-500-avg2'],
                 ['gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2', 'WebInstruct-verified-val-avg2'],
@@ -1018,7 +1044,7 @@ class RayPPOTrainer(object):
         with tqdm(total=len(self.val_dataloaders)) as pbar:
             for idx, val_dataloader in enumerate(self.val_dataloaders):
                 val_name = self.val_names[idx]
-                match = re.search(r'avg(\d*)', val_name)
+                match = re.search(r'Avg(\d*)', val_name)
                 if match and decoding_strategy == 'sampling':
                     n = int(match.group(1))
                     print(f"We rollout {n=} samples for {val_name}")
@@ -1292,7 +1318,7 @@ class RayPPOTrainer(object):
             f.write(str(self.global_steps))
 
     def _load_checkpoint(self):
-        if self.config.trainer.resume_mode == 'disable':
+        if self.config.trainer.resume_mode == 'disable' or self.config.trainer.get('val_only', False) is True:
             return 0
 
         # load from hdfs
@@ -1493,8 +1519,9 @@ class RayPPOTrainer(object):
 
         self.global_steps = 0
 
-        if 'prob' in self.config.reward_model.reward_manager:
-            promptgt2scoreA = self.compute_promptgt2scoreA(0)
+        if not self.config.trainer.get('val_only', False):
+            if 'prob' in self.config.reward_model.reward_manager:
+                promptgt2scoreA = self.compute_promptgt2scoreA(0)
 
         # load checkpoint before doing anything
         self._load_checkpoint()
@@ -1622,7 +1649,8 @@ class RayPPOTrainer(object):
                                 batch.batch['input_ids'], 
                                 skip_special_tokens=False
                             )
-                            prompts = [prompt.replace(self.tokenizer.pad_token, '') for prompt in prompts]
+                            # prompts = [prompt.replace(self.tokenizer.pad_token, '') for prompt in prompts]
+                            prompts = [replace_left_and_right_str(prompt, self.tokenizer.pad_token) for prompt in prompts]
 
                             # Extract ground truths for the entire batch
                             ground_truths = [item.non_tensor_batch['reward_model']['ground_truth'] for item in batch]
@@ -1669,7 +1697,7 @@ class RayPPOTrainer(object):
                             print(f"Using cross entropy reward...")
                             ground_truth_list = [batch[i_].non_tensor_batch['reward_model']['ground_truth'] for i_ in range(len(batch))]
                             ground_truth_list = [item for item in ground_truth_list for _ in range(self.config.actor_rollout_ref.rollout.n)]
-                            gen_batch_output_prob = self.construct_new_batch_optimized(gen_batch_output, ground_truth_list)
+                            gen_batch_output_pr = self.construct_new_batch_optimized(gen_batch_output, ground_truth_list)
 
                         # repeat to align with repeated responses in rollout
                         batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
@@ -1677,15 +1705,15 @@ class RayPPOTrainer(object):
 
 
                         if 'prob' in self.config.reward_model.reward_manager:
-                            batch = batch.union(gen_batch_output_prob)
+                            batch = batch.union(gen_batch_output_pr)
 
                         # do accuracy filtering and score logging
                         if self.config.data.get('filter_accuracy', False) or self.config.data.get('filter_truncated', False):
                             with _timer('verify', timing_raw):
                                 if 'prob' in self.config.reward_model.reward_manager:
-                                    with _timer('old_log_prob_prob', timing_raw):
-                                        old_log_prob_prob = self.actor_rollout_wg.compute_log_prob_prob(batch)
-                                        batch = batch.union(old_log_prob_prob) 
+                                    with _timer('old_log_prob_pr', timing_raw):
+                                        old_log_prob_pr = self.actor_rollout_wg.compute_log_prob_pr(batch)
+                                        batch = batch.union(old_log_prob_pr) 
                                         
                                 if 'mix' in self.config.reward_model.reward_manager:
                                     reward_tensor, scoreB_tensor, scoreA_tensor, format_reward_tensor, extracted_answer_list, straightA_tensor, exact_tensor, pr_scoreB_tensor, pr_scoreA_tensor, pr_reward_tensor, vr_reward_tensor = self.reward_fn(batch) # reward_tensor.shape: torch.Size([40, 1024])
@@ -1822,7 +1850,7 @@ class RayPPOTrainer(object):
                         buffer_batch = buffer_batch.slice(range(count, len(buffer_batch)))
                         if self.config.data.get("filter_cache_regenerate", False):
                             if 'prob' in self.config.reward_model.reward_manager:
-                                buffer_batch.pop([batch_k for batch_k in buffer_batch.batch.keys() if batch_k.endswith('_prob')])
+                                buffer_batch.pop([batch_k for batch_k in buffer_batch.batch.keys() if batch_k.endswith('_pr')])
                             cache_data = self.add_to_cache(cache_data, buffer_batch, n_samples, tmp_dict)
                             buffer_batch = []
                     else:
@@ -1858,9 +1886,9 @@ class RayPPOTrainer(object):
 
                     if 'prob' in self.config.reward_model.reward_manager and self.config.data.get("filter_accuracy", False) is False:
                         # If we use accuracy filter, then skip below
-                        with _timer('old_log_prob_prob', timing_raw):
-                            old_log_prob_prob = self.actor_rollout_wg.compute_log_prob_prob(batch)
-                            batch = batch.union(old_log_prob_prob)
+                        with _timer('old_log_prob_pr', timing_raw):
+                            old_log_prob_pr = self.actor_rollout_wg.compute_log_prob_pr(batch)
+                            batch = batch.union(old_log_prob_pr)
 
                     if self.use_reference_policy:
                         # compute reference log_prob
@@ -2071,14 +2099,13 @@ class RayPPOTrainer(object):
                     metrics.update(self.compute_final_reward_distribution_metrics(score_list))
 
                     if 'prob' in self.config.reward_model.reward_manager:
-                        # escape_keys = ['response_mask_prob']
                         if self.config.reward_model.get("optimize_think_only", True):
-                            escape_keys = ['response_mask_prob']
+                            escape_keys = ['response_mask_pr']
                         else:
                             escape_keys = []
                         if self.config.actor_rollout_ref.actor.get('use_sft_loss', False):
-                            escape_keys.extend(['ground_truth_mask_prob', 'old_log_probs_prob']) # For SFT loss
-                        batch_keys_rm = [batch_k for batch_k in batch.batch.keys() if (batch_k.endswith('_prob') and batch_k not in escape_keys)]
+                            escape_keys.extend(['ground_truth_mask_pr', 'old_log_probs_pr']) # For SFT loss
+                        batch_keys_rm = [batch_k for batch_k in batch.batch.keys() if (batch_k.endswith('_pr') and batch_k not in escape_keys)]
                         print(f"{batch_keys_rm=}")
                         batch.pop(batch_keys=batch_keys_rm)
 
@@ -2090,7 +2117,7 @@ class RayPPOTrainer(object):
                         actor_output_metrics = reduce_metrics(actor_output.meta_info['metrics'])
                         metrics.update(actor_output_metrics)
                     if 'prob' in self.config.reward_model.reward_manager:
-                        batch_keys_rm = [batch_k for batch_k in batch.batch.keys() if batch_k.endswith('_prob')]
+                        batch_keys_rm = [batch_k for batch_k in batch.batch.keys() if batch_k.endswith('_pr')]
                         if len(batch_keys_rm) != 0:
                             batch.pop(batch_keys=batch_keys_rm)
                     
@@ -2247,8 +2274,9 @@ class RayPPOTrainer(object):
 
             prompt_str = self.tokenizer.decode(batch_input_ids[i], skip_special_tokens=False)
             new_text = prompt_str + ' ' + ground_truth + ' ' + eos_token_str
-            new_text_rmpad = new_text.replace(self.tokenizer.pad_token, '')
-            if eos_token_str not in new_text_rmpad: # For a base model, the eos_token_str is the same as pad_token_str
+            # new_text_rmpad = new_text.replace(self.tokenizer.pad_token, '')
+            new_text_rmpad = replace_left_and_right_str(new_text, self.tokenizer.pad_token)
+            if not new_text_rmpad.endswith(eos_token_str): # For a base model, the eos_token_str is the same as pad_token_str
                 new_text_rmpad += eos_token_str
             outputs = self.tokenizer(new_text_rmpad, return_tensors='pt', add_special_tokens=False)
             input_ids = outputs['input_ids']
@@ -2257,6 +2285,10 @@ class RayPPOTrainer(object):
                 sep_str = '<｜Assistant｜><think>' + '\n'
             elif '<｜Assistant｜>' in self.tokenizer.chat_template:
                 sep_str = '<｜Assistant｜>' + '\n'
+            elif 'assistant<|end_header_id|>' in self.tokenizer.chat_template: # llama 3.1 8b Instruct
+                sep_str = 'assistant<|end_header_id|>\n' + '\n'
+            elif '<start_of_turn>model' in self.tokenizer.chat_template:
+                sep_str = '<start_of_turn>model' + '\n'
             else:
                 sep_str = '<|im_start|>assistant' + '\n'
             pos = self.locate_substring_tokens(new_text_rmpad, sep_str, self.tokenizer)
@@ -2300,7 +2332,8 @@ class RayPPOTrainer(object):
                 'ground_truth_mask': ground_truth_mask[0],
             }
 
-            prompt_str_list.append(prompt_str.replace(pad_token_str, ''))
+            # prompt_str_list.append(prompt_str.replace(pad_token_str, ''))
+            prompt_str_list.append(replace_left_and_right_str(prompt_str, pad_token_str))
             ground_truth_list.append(ground_truth)
             data_list.append(row_dict)
 
@@ -2357,59 +2390,57 @@ class RayPPOTrainer(object):
         gen_response_texts = self.tokenizer.batch_decode(gen_response_batch, skip_special_tokens=False)
 
         # 批量处理文本清理
-        gen_texts_rmpad = [text.replace(pad_token_str, '') for text in gen_texts]
-        gen_response_texts_rmpad = [text.replace(pad_token_str, '') for text in gen_response_texts]
+        # gen_texts_rmpad = [text.replace(pad_token_str, '') for text in gen_texts]
+        # gen_response_texts_rmpad = [text.replace(pad_token_str, '') for text in gen_response_texts]
+        # gen_text_rmpad = replace_left_and_right_str(gen_text, pad_token_str)
+        gen_texts_rmpad = [replace_left_and_right_str(text, pad_token_str) for text in gen_texts]
+        gen_response_texts_rmpad = [replace_left_and_right_str(text, pad_token_str) for text in gen_response_texts]
 
         # 确保所有文本都以 eos_token 结尾
         for i in range(batch_size):
-            if eos_token_str not in gen_texts_rmpad[i]:
+            if not gen_texts_rmpad[i].endswith(eos_token_str): # not in gen_texts_rmpad[i]:
                 gen_texts_rmpad[i] += eos_token_str
-            if eos_token_str not in gen_response_texts_rmpad[i]:
+            # if eos_token_str not in gen_response_texts_rmpad[i]:
+            if not gen_response_texts_rmpad[i].endswith(eos_token_str):
                 gen_response_texts_rmpad[i] += eos_token_str
 
         # 批量验证格式和构建新文本
         new_texts = []
         valid_flags = []
-        response_mask_prob_lengths = []
+        response_mask_pr_lengths = []
 
         for i in range(batch_size):
             gen_text_rmpad = gen_texts_rmpad[i]
             gen_response_text_rmpad = gen_response_texts_rmpad[i]
             ground_truth = ground_truth_batch[i]
 
-            start_think_count = gen_response_text_rmpad.count(start_think)
-            end_think_count = gen_response_text_rmpad.count(end_think)
+            if self.config.reward_model.get('format_mode', 'R1') == 'R1':
+                start_think_count = gen_response_text_rmpad.count(start_think)
+                end_think_count = gen_response_text_rmpad.count(end_think)
             middle_content, leading_whitespace, trailing_whitespace = ' ', ' ', ' '
 
             # 格式验证逻辑（保持与原方法一致）
-            if self.config.reward_model.get("version", None) == 'v2':
+            if self.config.reward_model.get("version", None) == 'v2.1':
                 start_answer_tag = '<answer>'
                 start_answer_count = gen_response_text_rmpad.count(start_answer_tag)
+                if self.config.reward_model.get('format_mode', 'R1') == 'R1':
+                    pattern = r'^.*' + start_think + r'.*' + end_think + r'.*' + start_answer_tag + r'.*$'
+                elif self.config.reward_model.get('format_mode', 'R1') == 'answer':
+                    pattern = r'^.*' + start_answer_tag + r'.*$'
                 valid_flag = (
-                        start_think_count == 1 and
-                        end_think_count == 1 and
-                        start_answer_count == 1 and
-                        start_think in gen_response_text_rmpad and
-                        end_think in gen_response_text_rmpad.split(start_think)[-1] and
-                        start_answer_tag in gen_response_text_rmpad.split(end_think)[-1]
-                )
-                if valid_flag:
-                    middle_content = gen_response_text_rmpad.split(end_think)[1].split(start_answer_tag)[0]
-
-            elif self.config.reward_model.get("version", None) == 'v2.1':
-                start_answer_tag = '<answer>'
-                end_answer_tag = '</answer>'
-                start_answer_count = gen_response_text_rmpad.count(start_answer_tag)
-                pattern = r'^.*' + start_think + r'.*' + end_think + r'.*' + start_answer_tag + r'.*$'
-                valid_flag = (
-                        start_think_count == 1 and
-                        end_think_count == 1 and
                         start_answer_count == 1 and
                         (re.fullmatch(pattern, gen_response_text_rmpad, re.DOTALL) is not None)
                 )
+                if self.config.reward_model.get('format_mode', 'R1') == 'R1':
+                    valid_flag = (
+                        valid_flag and 
+                        start_think_count == 1 and
+                        end_think_count == 1
+                    )
 
                 if valid_flag:
-                    middle_content = gen_response_text_rmpad.split(end_think)[1].split(start_answer_tag)[0]
+                    if self.config.reward_model.get('format_mode', 'R1') == 'R1':
+                        middle_content = gen_response_text_rmpad.split(end_think)[1].split(start_answer_tag)[0]
                     answer_section = gen_response_text_rmpad.split(start_answer_tag)[1]
 
                     if not answer_section.strip():
@@ -2446,24 +2477,36 @@ class RayPPOTrainer(object):
 
             # 构建新文本
             if valid_flag:
-                new_text = (end_think.join(gen_text_rmpad.split(end_think)[:-1]) +
-                            end_think + middle_content + start_answer +
-                            leading_whitespace + ground_truth + trailing_whitespace +
-                            end_answer + eos_token_str)
+                if self.config.reward_model.get('format_mode', 'R1') == 'R1':
+                    new_text = (end_think.join(gen_text_rmpad.split(end_think)[:-1]) +
+                                end_think + middle_content + start_answer +
+                                leading_whitespace + ground_truth + trailing_whitespace +
+                                end_answer + eos_token_str)
+                elif self.config.reward_model.get('format_mode', 'R1') == 'answer':
+                    new_text = (start_answer.join(gen_text_rmpad.split(start_answer)[:-1]) + 
+                                start_answer +
+                                leading_whitespace + ground_truth + trailing_whitespace + 
+                                end_answer + eos_token_str)
             else:
                 indices = (gen_response_batch[i] == self.tokenizer.eos_token_id).nonzero()
                 if indices.numel() > 0:
-                    response_mask_prob_length = indices[0].item()
+                    response_mask_pr_length = indices[0].item()
                 else:
-                    response_mask_prob_length = gen_response_batch[i].shape[-1]
-                response_mask_prob_lengths.append(response_mask_prob_length)
+                    response_mask_pr_length = gen_response_batch[i].shape[-1]
+                response_mask_pr_lengths.append(response_mask_pr_length)
 
-                end_text = (end_think + middle_content + start_answer +
-                            leading_whitespace + ground_truth + trailing_whitespace +
-                            end_answer + eos_token_str)
+                if self.config.reward_model.get('format_mode', 'R1') == 'R1':
+                    end_text = (end_think + middle_content + start_answer +
+                                leading_whitespace + ground_truth + trailing_whitespace +
+                                end_answer + eos_token_str)
+                elif self.config.reward_model.get('format_mode', 'R1') == 'answer':
+                    end_text = (start_answer + 
+                                leading_whitespace + ground_truth + trailing_whitespace + 
+                                end_answer + eos_token_str)
+
                 end_text_ids = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(end_text))
-                new_text = (self.tokenizer.decode(gen_ids_batch[i][:-len(end_text_ids) - 5],
-                                                  skip_special_tokens=False).replace(self.tokenizer.pad_token, "") +
+                new_text = (replace_left_and_right_str(self.tokenizer.decode(gen_ids_batch[i][:-len(end_text_ids) - 5],
+                                                  skip_special_tokens=False), self.tokenizer.pad_token) +
                             end_text)
 
             new_texts.append(new_text)
@@ -2483,7 +2526,7 @@ class RayPPOTrainer(object):
             pos_endthink_dict = {}
             for idx, pos in zip(valid_indices, valid_pos_endthink):
                 pos_endthink_dict[idx] = pos[-1] if pos else 0
-                response_mask_prob_lengths.append(pos_endthink_dict[idx] + 1 - prompts_batch_shape)
+                response_mask_pr_lengths.append(pos_endthink_dict[idx] + 1 - prompts_batch_shape)
 
         # 批量 tokenize 新文本
         batch_input_data = self.tokenizer(new_texts, return_tensors='pt',
@@ -2555,9 +2598,9 @@ class RayPPOTrainer(object):
                     ground_truth_mask[:, start:start + ground_truth_ids.shape[-1]] = 1
 
                 # 处理 response_mask
-                response_mask_prob = torch.zeros_like(gen_response_batch[i:i + 1])
-                if i < len(response_mask_prob_lengths):
-                    response_mask_prob[:, :response_mask_prob_lengths[i]] = 1
+                response_mask_pr = torch.zeros_like(gen_response_batch[i:i + 1])
+                if i < len(response_mask_pr_lengths):
+                    response_mask_pr[:, :response_mask_pr_lengths[i]] = 1
             else:
                 # 创建默认值
                 prompts = torch.zeros(1, max_length, dtype=torch.long)
@@ -2566,7 +2609,7 @@ class RayPPOTrainer(object):
                 attention_mask = torch.zeros_like(input_ids)
                 position_ids = torch.zeros_like(input_ids)
                 ground_truth_mask = torch.zeros_like(responses)
-                response_mask_prob = torch.zeros_like(gen_response_batch[i:i + 1])
+                response_mask_pr = torch.zeros_like(gen_response_batch[i:i + 1])
 
             # 添加到批次结果
             batch_results[f'prompts{suffix}'].append(prompts[0])
@@ -2575,7 +2618,7 @@ class RayPPOTrainer(object):
             batch_results[f'attention_mask{suffix}'].append(attention_mask[0])
             batch_results[f'position_ids{suffix}'].append(position_ids[0])
             batch_results[f'ground_truth_mask{suffix}'].append(ground_truth_mask[0])
-            batch_results[f'response_mask{suffix}'].append(response_mask_prob[0])
+            batch_results[f'response_mask{suffix}'].append(response_mask_pr[0])
 
         # 转换为张量
         for key in batch_results:
@@ -2624,7 +2667,7 @@ class RayPPOTrainer(object):
     def construct_new_batch_optimized(self, gen_batch_output, ground_truth_list,
                                       start_think='<think>', end_think='</think>',
                                       start_answer='<answer>', end_answer='</answer>',
-                                      suffix='_prob'):
+                                      suffix='_pr'):
         """
         优化后的批处理版本的 construct_new_batch
         """
@@ -2654,210 +2697,15 @@ class RayPPOTrainer(object):
         )
 
         # 调试输出（每100个样本输出一次）
-        for ii in range(0, len(gen_ids), 100):
-            print(f"Batch processing sample {ii}")
-            sample_dict = {key: batch_results[key][ii] for key in batch_results}
-            print(sample_dict)
-            print('-' * 50)
+        # for ii in range(0, len(gen_ids), 100):
+            # print(f"Batch processing sample {ii}")
+            # sample_dict = {key: batch_results[key][ii] for key in batch_results}
+            # print(sample_dict)
+            # print('-' * 50)
 
         gen_batch_output: DataProto = DataProto.from_single_dict(batch_results)
         self.tokenizer = self.tokenizer.tokenizer
         return gen_batch_output
-
-    def construct_new_batch(self, gen_batch_output, ground_truth_list, 
-                                  start_think='<think>', end_think='</think>', 
-                                  start_answer='<answer>', end_answer='</answer>',
-                                  suffix='_prob'):
-        """
-            We convert the `input_ids` to a new batch including IAP, `prompts_prob`, `responses_prob` and `ground_truth_mask_prob`.
-        """
-
-        gen_ids = gen_batch_output.batch['input_ids']     # prompt + response
-        gen_responses = gen_batch_output.batch['responses']  # response only
-
-        data_list = []
-        pad_token_str = self.tokenizer.pad_token
-        eos_token_str = self.tokenizer.eos_token
-
-        max_length = self.config.data.max_prompt_length + self.config.data.max_response_length
-        for ii in range(len(gen_ids)):
-            gen_text = self.tokenizer.decode(gen_ids[ii], skip_special_tokens=False) # '<|endoftext|>...<|endoftext|><|im_start|>system\n\nWhen tackling complex reasoning tasks, you have access to the following actions. Use them as needed to progress through your thought process.\n\n[ASSESS]\n\n[ADVANCE]\n\n[VERIFY]\n\n[SIMPLIFY]\n\n[SYNTHESIZE]\n\n[PIVOT]\n\n[OUTPUT]\n\nYou should strictly follow the format below:\n\n[ACTION NAME]\n\n# Your action step 1\n\n# Your action step 2\n\n# Your action step 3\n\n...\n\nNext action: [NEXT ACTION NAME]\n\n<|im_end|>\n<|im_start|>user\nCalculate $\\sqrt{48}-6\\sqrt{\\frac{1}{3}}-\\sqrt{18}÷\\sqrt{6}$.\n\nPresent the answer in LaTex format: \\boxed{Your answer}<|im_end|>\n<|im_start|>assistant\n[ACTION NAME]\n\n# First, calculate the square roots and simplify where possible.\n\n\\[\n\\sqrt{48}=\\sqrt{16\\cdot3}=4\\sqrt{3}\n\\]\n\n\\[\n-\\sqrt{18}÷\\sqrt{6}=-\\sqrt{18÷6}=-\\sqrt{3}\n\\]\n\nNext, simplify \\(6\\sqrt{\\frac{1}{3}}\\):\n\n\\[\n6\\sqrt{\\frac{1}{3}}=6\\cdot\\frac{1}{\\sqrt{3}}=6\\cdot\\frac{\\sqrt{3}}{3}=2\\sqrt{3}\n\\]\n\n# Now, put it all together:\n\n\\[\n\\sqrt{48}-6\\sqrt{\\frac{1}{3}}-\\sqrt{18}÷\\sqrt{6} = 4\\sqrt{3} - 2\\sqrt{3} - (-\\sqrt{3})\n\\]\n\n# Simplify the expression:\n\n\\[\n4\\sqrt{3} - 2\\sqrt{3} + \\sqrt{3} = (4-2+1)\\sqrt{3} = 3\\sqrt{3}\n\\]\n\n# Present the answer in LaTex format:\n\n\\[\n\\boxed{3\\sqrt{3}}\n\\]\n\nNext action: [OUTPUT]\n\n**OUTPUT**: The answer in LaTeX format is \\(\\boxed{3\\sqrt{3}}\\).<|im_end|><|endoftext|>...<|endoftext|>'
-            gen_text_rmpad = gen_text.replace(pad_token_str, '')
-            if eos_token_str not in gen_text_rmpad:
-                gen_text_rmpad += eos_token_str
-            gen_responses_text = self.tokenizer.decode(gen_responses[ii], skip_special_tokens=False)
-            gen_responses_text_rmpad = gen_responses_text.replace(pad_token_str, '')
-            if eos_token_str not in gen_responses_text_rmpad:
-                gen_responses_text_rmpad += eos_token_str
-
-            ground_truth = str(ground_truth_list[ii])
-
-            start_think_count = gen_responses_text_rmpad.count(start_think)
-            end_think_count = gen_responses_text_rmpad.count(end_think)
-            middle_content, leading_whitespace, trailing_whitespace = ' ', ' ', ' ' # content between `</think>` and `<answer>`
-            assert self.config.reward_model.get("version", None) != 'v2.2', "This is discarded"
-            if self.config.reward_model.get("version", None) == 'v2':
-                start_answer_tag = '<answer>' # The contrastive reward sets the start_answer as "<answer> The correct answer is:", but we only detect "<answer>"
-                start_answer_count = gen_responses_text_rmpad.count(start_answer_tag)
-                valid_flag = (
-                    start_think_count == 1 and 
-                    end_think_count == 1 and 
-                    start_answer_count == 1 and
-                    start_think in gen_responses_text_rmpad and 
-                    end_think in gen_responses_text_rmpad.split(start_think)[-1] and
-                    start_answer_tag in gen_responses_text_rmpad.split(end_think)[-1]
-                )
-                if valid_flag:
-                    middle_content = gen_responses_text_rmpad.split(end_think)[1].split(start_answer_tag)[0]
-            elif self.config.reward_model.get("version", None) == 'v2.1':
-                start_answer_tag = '<answer>' # The contrastive reward sets the start_answer as "<answer> The correct answer is:", but we only detect "<answer>"
-                end_answer_tag=  '</answer>'
-                start_answer_count = gen_responses_text_rmpad.count(start_answer_tag)
-                pattern = r'^.*' + start_think + r'.*' + end_think +  r'.*' + start_answer_tag + r'.*$'
-                valid_flag = (
-                    start_think_count == 1 and
-                    end_think_count == 1 and
-                    start_answer_count == 1 and
-                    (re.fullmatch(pattern, gen_responses_text_rmpad, re.DOTALL) is not None)
-                )
-
-                if valid_flag:
-                    middle_content = gen_responses_text_rmpad.split(end_think)[1].split(start_answer_tag)[0]
-       
-                    # Extract answer section and its whitespace
-                    answer_section = gen_responses_text_rmpad.split(start_answer_tag)[1]
-                    
-                    # Check if answer section contains only whitespace
-                    if not answer_section.strip():  # This checks if string is empty or only whitespace
-                        valid_flag = False
-                    else:
-                        # Extract leading whitespace (spaces and newlines) after <answer>
-                        leading_whitespace = ''
-                        for i, char in enumerate(answer_section):
-                            if char in [' ', '\n', '\t', '\r']:
-                                leading_whitespace += char
-                            else:
-                                break
-                        if self.config.reward_model.get("gt_tokens_one_more", False) is True: # Extend one more GT token
-                            match = re.search('(\s*)</answer>', answer_section)
-                            if match:
-                                trailing_whitespace = match.group(1)
-            else:
-                valid_flag = (
-                    start_think_count == 1 and 
-                    end_think_count == 1 and 
-                    start_think in gen_responses_text_rmpad and 
-                    end_think in gen_responses_text_rmpad.split(start_think)[-1]
-                )
-            # middle_content = middle_content if middle_content != '' else ' '
-            if self.config.reward_model.get("allow_empty_leading_whitespaces", False) is False: # if we do not allow empty one
-                leading_whitespace = leading_whitespace if leading_whitespace != '' else ' '
-            if self.config.reward_model.get("gt_tokens_one_more", False) is True: # Extend one more GT token
-                # We do not pad the trailing whitespace
-                pass
-            else:
-                trailing_whitespace = trailing_whitespace if trailing_whitespace != '' else ' '
-            if valid_flag:
-                pos_endthink_in_original_ids = self.locate_substring_tokens(gen_text, end_think, self.tokenizer) # list
-
-                # NOTE: the calculation below has one issue: if </think> is closely connected to the next string, then it might not be accurately calculated.
-                # For example, <think> aaa </think><answer> xxx </answer>. It is possible we end with "</think><"
-                response_mask_prob_length = pos_endthink_in_original_ids[-1] + 1 - gen_batch_output.batch['prompts'].shape[-1]
-                new_text = end_think.join(gen_text_rmpad.split(end_think)[:-1]) + end_think + middle_content + start_answer + leading_whitespace + ground_truth + trailing_whitespace + end_answer + eos_token_str
-            else:
-                indices = (gen_responses[ii] == self.tokenizer.eos_token_id).nonzero()
-                if indices.numel() > 0:
-                    response_mask_prob_length = indices[0].item()
-                else:
-                    response_mask_prob_length = gen_responses[ii].shape[-1]
-                # No matter how we construct this new text, the final score is 0, including the format reward
-                end_text = end_think + middle_content + start_answer + leading_whitespace + ground_truth + trailing_whitespace + end_answer + eos_token_str # \nThe answer is \\boxed{xx}<|im_end|>
-                end_text_ids = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(end_text))
-                new_text = self.tokenizer.decode(gen_ids[ii][:-len(end_text_ids) - 5], skip_special_tokens=False).replace(self.tokenizer.pad_token, "") + end_text
-
-            response_mask_prob = torch.zeros_like(gen_responses[ii])
-            response_mask_prob[:response_mask_prob_length] = 1
-
-
-            input_data = self.tokenizer(new_text, return_tensors='pt', add_special_tokens=False)
-            input_ids = input_data['input_ids']
-            attention_mask = input_data['attention_mask']
-            if len(input_ids) > max_length: # It is possible that both start answer and end answer exist but it exceeds the max length
-                valid_flag = False
-
-
-            pos_startanswer = self.locate_substring_tokens(new_text, start_answer, self.tokenizer) # list
-            prompts = input_ids[:, :pos_startanswer[0]] # ids that ends to the </think>
-            responses = input_ids[:, pos_startanswer[0]:]
-
-            pos_gt = self.locate_substring_tokens(new_text, ground_truth, self.tokenizer, ignore_end_text=end_answer + eos_token_str) # list
-            if self.config.reward_model.get("gt_tokens_one_more", False) is True: # Extend one more GT token
-                pos_gt.append(pos_gt[-1] + 1)
-
-            ground_truth_ids = input_ids[:, pos_gt[0]:pos_gt[-1] + 1]
-            start = (pos_gt[0]) - (pos_startanswer[0])
-
-            # Pad prompts and responses for future packing
-            left_pad_tuple = (max_length - prompts.shape[-1], 0)
-            right_pad_tuple = (0, self.config.data.max_response_length - responses.shape[-1])
-
-            prompts = F.pad(prompts, left_pad_tuple, 'constant', self.tokenizer.pad_token_id) # pad to be max_length before collate_fn
-            responses = F.pad(responses, right_pad_tuple, 'constant', self.tokenizer.pad_token_id) # pad to be max_response_length before collate_fn
-
-            input_ids = torch.cat([prompts, responses], dim=-1)
-
-            # pad right first
-            position_ids = compute_position_id_with_mask(F.pad(attention_mask, right_pad_tuple, 'constant', 1))
-            attention_mask = F.pad(attention_mask, right_pad_tuple, 'constant', 0)
-            # then pad left
-            attention_mask = F.pad(attention_mask, left_pad_tuple, 'constant', 0)
-            position_ids = F.pad(position_ids, left_pad_tuple, 'constant', 0)
-
-            assert input_ids.ndim == 2
-            sequence_length = input_ids.shape[-1]
-            if sequence_length > max_length + self.config.data.max_response_length: # truncation error
-                raise NotImplementedError(f'{sequence_length=} is larger than {max_length=}')
-
-            ground_truth_mask = torch.zeros_like(responses)
-            if valid_flag:
-                ground_truth_mask[:, start:start + ground_truth_ids.shape[-1]] = 1 # Suppose the response is <think> ABC </think> <answer> DEF </answer>. Then the mask is on " DEF ".
-
-
-            # if ii % 100 == 0:
-            #     print(f"{new_text=}")
-            #     print(f"{ground_truth_ids=}")# tensor([[ 5672, 12738, 26278]])
-            #     print(f"{valid_flag=}")
-            #     response_mask_prob_shift_left = torch.zeros_like(gen_responses[ii])
-            #     response_mask_prob_shift_left[:response_mask_prob_length-1] = 1
-            #     response_mask_prob_shift_right = torch.zeros_like(gen_responses[ii])
-            #     response_mask_prob_shift_right[:response_mask_prob_length+1] = 1
-            #     print(f"Original response (shifted left) that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_prob_shift_left.bool()])=}") # '<think> The question is asking for ...  it. </think'
-            #     print(f"Original response that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_prob.bool()])=}") # '<think> The question is asking about the architect who designed the Shard Building, which is the tallest building in London. I need to recall the architect associated with this major landmark. \n\nThe Shard in London is designed by architect Renzo Piano. </think>\n\n'
-            #     print(f"Original response (shifted right) that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_prob_shift_right.bool()])=}") # '<think> The question is asking for ... it. </think>\n\n<'
-            #     print(f"Original response || {self.tokenizer.decode(gen_responses[ii]).replace(pad_token_str, '')=}") # '<think> The question is asking about the architect who designed the Shard Building, which is the tallest building in London. I need to recall the architect associated with this major landmark. \n\nThe Shard in London is designed by architect Renzo Piano. </think>\n\n<answer> The architect who designed the Shard Building in London is Renzo Piano. </answer><|im_end|>
-            #     print(f"New Prompt || {self.tokenizer.decode(prompts[0], skip_special_tokens=True)=}")# 'system\nA conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think> <answer> answer here </answer>.\nuser\nPlease answer this question: Which architect designed the 87-storey Shard Building in London?\nassistant\n<think> The question is asking for the architect of the Shard Building in London. I will need to recall information about famous architecture in London and the Shard Building specifically.\n\nThe Shard Building in London was designed by the Italian architect Renzo Piano. \n\n </think>'
-            #     print(f"New Response || {self.tokenizer.decode(responses[0], skip_special_tokens=True)=}") # ' <answer> renzo piano </answer>'
-
-            #     print(f"Ground-truth in the new response || {self.tokenizer.decode(responses[ground_truth_mask.bool()], skip_special_tokens=False)=}") # ' renzo piano'
-
-            #     original_response_mask = gen_batch_output.batch['attention_mask'][:, -gen_responses.size(1):] # This will be originally used in updating actor
-            #     print(f"Original response || {self.tokenizer.decode(gen_responses[ii][original_response_mask[ii].bool()])=}")  # <think> I need to remember that these seem to be names, and I should use a translation tool or my own knowledge of languages to translate them. Unfortunately, as a text-based AI, I might not be able to accurately translate names from one language to another. However, given my own knowledge, it could seem like these are Indian names, with both likely being given names. </think>\n<answer> Tandon, Ravana </answer><|im_end|>
-            #     print('-'*50)
- 
-
-            row_dict = {
-                f'prompts{suffix}': prompts[0], # prompt + ...</think>
-                f'responses{suffix}': responses[0], # </think>+1 ... <eos> (replaced by gt)
-                f'input_ids{suffix}': input_ids[0],  # prompt + response (replaced by gt)
-                f'attention_mask{suffix}': attention_mask[0], # mask prompt + response (replaced by gt) in input_ids_prob
-                f'position_ids{suffix}': position_ids[0], # position ids for prompt + response (replaced by gt)
-                f'ground_truth_mask{suffix}': ground_truth_mask[0], # mask ground_truth in </think>+1 ... <eos>
-                f'response_mask{suffix}': response_mask_prob, # mask begin_response ... </think> in response (replaced by gt)
-            }
-            data_list.append(row_dict)
-        gen_batch_output: DataProto = DataProto.from_single_dict(self.collate_fn(data_list))
-        return gen_batch_output
-
 
     def locate_substring_tokens(self, full_string, substring, tokenizer, ignore_end_text=None):
         """
@@ -3100,7 +2948,7 @@ class RayPPOTrainer(object):
         df.sort_values('uid', inplace=True)
 
         # Create directory if it doesn't exist
-        save_path = f"./data/logs/train_generations/{self.config.trainer.experiment_name}_step{self.global_steps}.csv"
+        save_path = f"data/logs/train_generations/{self.config.trainer.experiment_name}_step{self.global_steps}.csv"
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         
         # Save to CSV
@@ -3192,10 +3040,10 @@ class RayPPOTrainer(object):
             # Process each item in the batch
 
             for i in range(len(batch)):
-                prompt = self.tokenizer.decode(
+                prompt = replace_left_and_right_str(self.tokenizer.decode(
                     batch.batch[i]['input_ids'], 
                     skip_special_tokens=False
-                ).replace(self.tokenizer.pad_token, '')
+                ), self.tokenizer.pad_token)
                 ground_truth = batch[i].non_tensor_batch['reward_model']['ground_truth']
                 key = prompt + '\n\n\n' + ground_truth
                 if key not in promptgt2scoreA:
@@ -3204,7 +3052,7 @@ class RayPPOTrainer(object):
             if idx >= len(self.train_dataloader) + 4:
                 break
 
-        save_path = './data/logs/promptgt2scoreA.json'
+        save_path = 'data/logs/promptgt2scoreA.json'
         with open(save_path, 'w') as file:
             print(f"We dump to {save_path}")
             json.dump(promptgt2scoreA, file)
@@ -3249,7 +3097,7 @@ class RayPPOTrainer(object):
             })
         
         # Create directory if it doesn't exist
-        save_path = f"./data/logs/rollout/{self.config.trainer.experiment_name}_step{self.global_steps}.csv"
+        save_path = f"data/logs/rollout/{self.config.trainer.experiment_name}_step{self.global_steps}.csv"
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         
         df = pd.DataFrame(results)
@@ -3418,3 +3266,10 @@ class RayPPOTrainer(object):
             
             result[f'critic_during_filter_mean/{prefix}{postfix}'] = total / count
         return result
+
+def replace_left_and_right_str(text, left_str):
+    while text.startswith(left_str):
+        text = text[len(left_str):]
+    while text.endswith(left_str):
+        text = text[:-len(left_str)]
+    return text

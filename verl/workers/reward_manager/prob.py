@@ -127,9 +127,14 @@ def threshold_t_tanh_k(score, t, k=6):
     return transformed_score
 
 
-def format_reward(predict_str: str, prompt_str: str) -> float:
+def format_reward(predict_str: str, format_mode='R1') -> float:
     def _validate_tags(input_string):
-        tags = ['<think>', '</think>', '<answer>', '</answer>']
+        if format_mode == 'R1':
+            tags = ['<think>', '</think>', '<answer>', '</answer>']
+        elif format_mode == 'answer':
+            tags = ['<answer>', '</answer>']
+        else:
+            raise ValueError(f"Unsupported format mode: {format_mode}")
         for tag in tags:
             if input_string.count(tag) != 1:
                 return 0.0
@@ -137,7 +142,10 @@ def format_reward(predict_str: str, prompt_str: str) -> float:
 
     if _validate_tags(predict_str) == 0.0:
         return 0.0
-    pattern = re.compile(r'<think>.*</think>.*<answer>.*</answer>.*', re.DOTALL)
+    if format_mode == 'R1':
+        pattern = re.compile(r'<think>.*</think>.*<answer>.*</answer>.*', re.DOTALL)
+    elif format_mode == 'answer':
+        pattern = re.compile(r'.*<answer>.*</answer>.*', re.DOTALL)
     match_result = re.fullmatch(pattern, predict_str)
 
     return 1.0 if match_result else 0.0
@@ -150,7 +158,8 @@ class ProbRewardManager:
     def __init__(self, tokenizer, num_examine, compute_score_name=None, 
                  shaping_function_name=None, discrete_function_name=None, 
                  format_coefficient=0.1, save_results_dir=None, reward_type='pr',
-                 gt_tokens_one_more=False, gt_tokens_one_more_adjusted=False) -> None:
+                 gt_tokens_one_more=False, gt_tokens_one_more_adjusted=False,
+                 format_mode='R1') -> None:
         self.tokenizer = tokenizer
         self.num_examine = num_examine  # the number of batches of decoded responses to print to the console
         # assert compute_score is None
@@ -201,10 +210,11 @@ class ProbRewardManager:
         self.format_coefficient = format_coefficient
         assert reward_type in ['pr', 'pr+vr']
         self.reward_type = reward_type
+        self.format_mode = format_mode
         self.gt_tokens_one_more = gt_tokens_one_more
         self.gt_tokens_one_more_adjusted = gt_tokens_one_more_adjusted
 
-    def __call__(self, data: DataProto, suffix='_prob'):
+    def __call__(self, data: DataProto):
         """We will expand this function gradually based on the available datasets"""
 
         if 'rm_scores' in data.batch.keys():
@@ -239,7 +249,7 @@ class ProbRewardManager:
 
             prompt_str = self.tokenizer.decode(valid_prompt_ids) # '<|im_start|>system\nA conversation between ... answer here </answer>.<|im_end|>\n<|im_start|>user\nLet the parabola ... and $X_{M}$.<|im_end|>\n<|im_start|>assistant\n'
             predict_str = self.tokenizer.decode(valid_response_ids) # To determine the relationship ... relative to each other and the parabola.<|im_end|>
-            format_score = format_reward(predict_str=predict_str, prompt_str=prompt_str)
+            format_score = format_reward(predict_str=predict_str, format_mode=self.format_mode)
 
             scoreA, scoreB, extracted_answer = self.compute_scoreA_scoreB_and_extracted_answer(data_item, valid_response_ids=valid_response_ids)
             score_delta = scoreB - scoreA
@@ -329,7 +339,7 @@ class ProbRewardManager:
             scoreA = 0
             extracted_answer = res[1]
         else:
-            scoreB = self.compute_scoreB(data_item.batch['old_log_probs_prob'], data_item.batch['ground_truth_mask_prob']) # shape: [1024]
+            scoreB = self.compute_scoreB(data_item.batch['old_log_probs_pr'], data_item.batch['ground_truth_mask_pr']) # shape: [1024]
             scoreA = data_item.non_tensor_batch['reward_model'].get('scoreA', 0.0)
 
             predict_str = self.tokenizer.decode(valid_response_ids) # To determine the relationship ... relative to each other and the parabola.<|im_end|>

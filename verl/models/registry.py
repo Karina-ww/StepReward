@@ -20,11 +20,11 @@ import torch.nn as nn
 # Supported models using HF Rmpad
 # TODO(sgm): HF may supported more than listed here, we should add more after testing
 try:
-    from transformers import LlamaConfig, MistralConfig, GemmaConfig, Qwen2Config, Qwen3Config
-    _REOVEPAD_MODELS = {'llama': LlamaConfig, 'mistral': MistralConfig, 'gemma': GemmaConfig, 'qwen2': Qwen2Config, 'qwen3': Qwen3Config}
+    from transformers import LlamaConfig, MistralConfig, GemmaConfig, Qwen2Config, Qwen3Config, Gemma2Config
+    _REOVEPAD_MODELS = {'llama': LlamaConfig, 'mistral': MistralConfig, 'gemma': GemmaConfig, 'qwen2': Qwen2Config, 'qwen3': Qwen3Config, 'gemma2': Gemma2Config}
 except:
-    from transformers import LlamaConfig, MistralConfig, GemmaConfig, Qwen2Config
-    _REOVEPAD_MODELS = {'llama': LlamaConfig, 'mistral': MistralConfig, 'gemma': GemmaConfig, 'qwen2': Qwen2Config}
+    from transformers import LlamaConfig, MistralConfig, GemmaConfig, Qwen2Config, Gemma2Config
+    _REOVEPAD_MODELS = {'llama': LlamaConfig, 'mistral': MistralConfig, 'gemma': GemmaConfig, 'qwen2': Qwen2Config, 'gemma2': Gemma2Config}
 
 
 def check_model_support_rmpad(model_type: str):

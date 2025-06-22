@@ -16,7 +16,7 @@ class MixRewardManager(object):
     def __init__(
         self, tokenizer, num_examine, compute_exact_score_func=None,
         compute_fuzzy_score_name=None, shaping_function_name=None, discrete_function_name=None, format_coefficient=0.1,
-        n_rollouts=None, mix_type: Literal['soft', 'hard']='hard', pr_weight=0.5, vr_weight=1.0
+        n_rollouts=None, mix_type: Literal['soft', 'hard']='hard', pr_weight=0.5, vr_weight=1.0, format_mode='R1',
     ) -> None:
         self.vr_manager = NaiveRewardManager(
             tokenizer=tokenizer,
@@ -30,7 +30,9 @@ class MixRewardManager(object):
             shaping_function_name=shaping_function_name,
             discrete_function_name=discrete_function_name,
             format_coefficient=format_coefficient,
+            format_mode=format_mode,
         )
+        self.format_mode = format_mode
         self.n_rollouts = n_rollouts
         self.mix_type = mix_type
         self.pr_weight = pr_weight

@@ -106,7 +106,7 @@ def main_task(config, compute_score=None):
     if reward_manager_name == 'naive':
         from verl.workers.reward_manager import NaiveRewardManager
         reward_manager_cls = NaiveRewardManager
-        reward_fn = reward_manager_cls(tokenizer=tokenizer, num_examine=0, compute_score=compute_score)
+        reward_fn = reward_manager_cls(tokenizer=tokenizer, num_examine=0, compute_score=compute_score, format_mode=config.reward_model.get('format_mode', 'R1'))
     elif reward_manager_name == 'prime':
         from verl.workers.reward_manager import PrimeRewardManager
         reward_manager_cls = PrimeRewardManager
@@ -125,6 +125,8 @@ def main_task(config, compute_score=None):
             mix_type=config.reward_model.get('mix_type', 'hard'),
             pr_weight=config.reward_model.get('pr_weight', 0.5),
             vr_weight=config.reward_model.get('vr_weight', 1.0),
+            format_mode=config.reward_model.get('format_mode', 'R1'),
+
         )
     elif 'prob' in reward_manager_name: # cross entropy
         from verl.workers.reward_manager import ProbRewardManager
@@ -137,6 +139,7 @@ def main_task(config, compute_score=None):
                                        reward_type=config.reward_model.get('reward_type', 'pr'),
                                        gt_tokens_one_more=config.reward_model.get('gt_tokens_one_more', False), 
                                        gt_tokens_one_more_adjusted=config.reward_model.get('gt_tokens_one_more_adjusted', False),
+                                       format_mode=config.reward_model.get('format_mode', 'R1'),
                                        )
 
     else:

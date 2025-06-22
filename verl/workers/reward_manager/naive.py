@@ -24,12 +24,13 @@ class NaiveRewardManager:
     """The reward manager.
     """
 
-    def __init__(self, tokenizer, num_examine, compute_score=None, save_results_dir=None, phase='train') -> None:
+    def __init__(self, tokenizer, num_examine, compute_score=None, save_results_dir=None, phase='train', format_mode='R1') -> None:
         self.tokenizer = tokenizer
         self.num_examine = num_examine  # the number of batches of decoded responses to print to the console
         self.compute_score = compute_score or _default_compute_score
         self.save_results_dir = save_results_dir
         self.phase = phase # If validation, we use client to evaluate
+        self.format_mode = format_mode 
 
     def __call__(self, data: DataProto, name=None):
         """We will expand this function gradually based on the available datasets"""
@@ -85,6 +86,7 @@ class NaiveRewardManager:
                     extra_info,
                     self.tokenizer.decode(valid_prompt_ids, skip_special_tokens=True),
                     self.phase,
+                    self.format_mode,
                 )
 
                 #  acc, format_score, extracted_answer, from_judge, judge_response, judge_prompt

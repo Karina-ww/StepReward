@@ -327,7 +327,7 @@ class DataParallelPPOActor(BasePPOActor):
 
         return log_probs, entropy
 
-    def compute_log_prob_prob(self, data: DataProto) -> torch.Tensor:
+    def compute_log_prob_pr(self, data: DataProto) -> torch.Tensor:
         """Compute the log probability of the responses given input_ids, attention_mask and position_ids
 
         Args:
@@ -352,15 +352,10 @@ class DataParallelPPOActor(BasePPOActor):
         temperature = data.meta_info['temperature']  # temperature must be in the data.meta_info to avoid slient error
         use_dynamic_bsz = data.meta_info['use_dynamic_bsz']
 
-        # prompt: <system> ... </think>
-        # responses_prob: </think>+1 ... <eos>
-        # input_ids_prob: prompt + response (replaced by gt)
-        # attention_mask_prob: mask prompt + response (replaced by gt) in input_ids_prob
-        # position_ids_prob: position ids for prompt + response (replaced by gt)
-        select_keys = ['responses_prob', f'input_ids_prob', f'attention_mask_prob', f'position_ids_prob']
+        select_keys = ['responses_pr', f'input_ids_pr', f'attention_mask_pr', f'position_ids_pr']
         batch = data.select(batch_keys=select_keys).batch
         for select_k in select_keys:
-            batch[select_k.replace('_prob', '')] = batch.pop(select_k)
+            batch[select_k.replace('_pr', '')] = batch.pop(select_k)
 
         if use_dynamic_bsz:
             # split using dynamic bsz
@@ -471,17 +466,17 @@ class DataParallelPPOActor(BasePPOActor):
             if self.config.use_kl_loss:
                 select_keys.append('ref_log_prob')
             if self.config.get('use_sft_loss', False) and self.config.get('sft_type', 'bilevel') == 'multi_task':
-                select_keys.extend(['ground_truth_mask_prob', 'old_log_probs_prob'])
+                select_keys.extend(['ground_truth_mask_pr', 'old_log_probs_pr'])
             if 'response_mask_prob' in data.batch.keys(): # '1 + 2 = ' --> Model --> '<think> aaa </think> <answer> Model answer (GT) </answer>'
                 # GT: 3
                 # '1 + 2 = ' --> Model --> '<think> aaa </think> <answer> 123 </answer>' --> '<think> aaa </think> <answer> 3 </answer>' # 0.2
                 # 0.2 is given to "<think> aaa </think>"
                 # P(GT|Q + T)
-                select_keys.append('response_mask_prob')
+                select_keys.append('response_mask_pr')
         elif mode == 'sft_only':
             assert self.config.get('use_sft_loss', False) and self.config.get('sft_type') == 'bilevel'
             select_keys = ['responses', 'input_ids', 'attention_mask', 'position_ids',
-                           'old_log_probs', 'ground_truth_mask_prob', 'old_log_probs_prob']
+                           'old_log_probs', 'ground_truth_mask_pr', 'old_log_probs_pr']
         else:
             raise NotImplementedError
         batch = data.select(batch_keys=select_keys).batch
@@ -510,8 +505,8 @@ class DataParallelPPOActor(BasePPOActor):
                     responses = data['responses']
                     response_length = responses.size(1)
                     # We truncate the response mask here.
-                    if 'response_mask_prob' in data: # if optimize think only
-                        response_mask = data['response_mask_prob']
+                    if 'response_mask_pr' in data: # if optimize think only
+                        response_mask = data['response_mask_pr']
                     else:
                         attention_mask = data['attention_mask']
                         response_mask = attention_mask[:, -response_length:]
@@ -558,13 +553,13 @@ class DataParallelPPOActor(BasePPOActor):
 
                     # Add SFT loss if enabled
                     if self.config.get('use_sft_loss', False) and self.config.get('sft_type', 'bilevel') == 'multi_task':
-                        ground_truth_mask_prob = data['ground_truth_mask_prob']
-                        old_log_prob_prob = data['old_log_probs_prob']
+                        ground_truth_mask_pr = data['ground_truth_mask_pr']
+                        old_log_prob_pr = data['old_log_probs_pr']
                         # Get log probs for ground truth tokens
                         eps = 1e-6
-                        gt_old_log_prob_prob = ground_truth_mask_prob * old_log_prob_prob
-                        token_mean_gt_old_log_prob_prob = gt_old_log_prob_prob.sum(dim=1) / (ground_truth_mask_prob.sum(dim=1) + eps)
-                        sft_log_probs = token_mean_gt_old_log_prob_prob.sum() / (torch.count_nonzero(token_mean_gt_old_log_prob_prob) + eps)
+                        gt_old_log_prob_pr = ground_truth_mask_pr * old_log_prob_pr
+                        token_mean_gt_old_log_prob_pr = gt_old_log_prob_pr.sum(dim=1) / (ground_truth_mask_pr.sum(dim=1) + eps)
+                        sft_log_probs = token_mean_gt_old_log_prob_pr.sum() / (torch.count_nonzero(token_mean_gt_old_log_prob_pr) + eps)
                         # Compute negative log likelihood loss (cross entropy)
                         sft_loss = -sft_log_probs
                         policy_loss = policy_loss + sft_loss * self.config.sft_loss_coef
@@ -581,13 +576,13 @@ class DataParallelPPOActor(BasePPOActor):
 
                 elif mode == 'sft_only':
                     assert self.config.get('use_sft_loss', False) and self.config.get('sft_type') == 'bilevel'
-                    ground_truth_mask_prob = data['ground_truth_mask_prob']
-                    old_log_prob_prob = data['old_log_probs_prob']
+                    ground_truth_mask_pr = data['ground_truth_mask_pr']
+                    old_log_prob_pr = data['old_log_probs_pr']
                     # Get log probs for ground truth tokens
                     eps = 1e-6
-                    gt_old_log_prob_prob = ground_truth_mask_prob * old_log_prob_prob
-                    token_mean_gt_old_log_prob_prob = gt_old_log_prob_prob.sum(dim=1) / (ground_truth_mask_prob.sum(dim=1) + eps)
-                    sft_log_probs = token_mean_gt_old_log_prob_prob.sum() / (torch.count_nonzero(token_mean_gt_old_log_prob_prob) + eps)
+                    gt_old_log_prob_pr = ground_truth_mask_pr * old_log_prob_pr
+                    token_mean_gt_old_log_prob_pr = gt_old_log_prob_pr.sum(dim=1) / (ground_truth_mask_pr.sum(dim=1) + eps)
+                    sft_log_probs = token_mean_gt_old_log_prob_pr.sum() / (torch.count_nonzero(token_mean_gt_old_log_prob_pr) + eps)
                     # Compute negative log likelihood loss (cross entropy)
                     sft_loss = -sft_log_probs
                     policy_loss = sft_loss * self.config.sft_loss_coef

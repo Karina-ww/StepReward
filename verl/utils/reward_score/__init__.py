@@ -37,7 +37,7 @@ if used_model in ['gpt-4o', 'gpt-4.1']:
 elif used_model == 'no_api':
     print("We do not use API for evaluation")
 else:
-    client_ip = os.environ.get('CLIENT_IP', 'http://10.156.9.59:8000')
+    client_ip = os.environ.get('CLIENT_IP', 'http://127.0.0.1:8001')
     print(client_ip)
     client = ChatClient(server_url=client_ip, model="qwen")
 
@@ -93,9 +93,12 @@ Please put your final extracted option, i.e., "Y" or "N" in \\boxed{{}}.'''
 
 
 
-def format_reward(predict_str: str, prompt_str: str) -> float:
+def format_reward(predict_str: str, prompt_str: str, format_mode='R1') -> float:
     def _validate_tags(input_string):
-        tags = ['<think>', '</think>', '<answer>', '</answer>']
+        if format_mode == 'R1':
+            tags = ['<think>', '</think>', '<answer>', '</answer>']
+        elif format_mode == 'answer':
+            tags = ['<answer>', '</answer>']
         for tag in tags:
             if input_string.count(tag) != 1:
                 return 0.0
@@ -104,7 +107,10 @@ def format_reward(predict_str: str, prompt_str: str) -> float:
     if '<answer>' in prompt_str and '</answer>' in prompt_str:
         if _validate_tags(predict_str) == 0.0:
             return 0.0
-        pattern = re.compile(r'<think>.*</think>.*<answer>.*</answer>.*', re.DOTALL)
+        if format_mode == 'R1':
+            pattern = re.compile(r'<think>.*</think>.*<answer>.*</answer>.*', re.DOTALL)
+        elif format_mode == 'answer':
+            pattern = re.compile(r'.*<answer>.*</answer>.*', re.DOTALL)
         match_result = re.fullmatch(pattern, predict_str)
     elif '\\boxed{' in prompt_str:
         pattern = re.compile(r'.*\\boxed\{.*\}.*', re.DOTALL)
@@ -114,8 +120,8 @@ def format_reward(predict_str: str, prompt_str: str) -> float:
     
     return 1.0 if match_result else 0.0
 
-def _default_compute_score(data_source, solution_str, ground_truth, extra_info=None, prompt_str=None, phase='train'):
-    format_score = format_reward(solution_str, prompt_str)
+def _default_compute_score(data_source, solution_str, ground_truth, extra_info=None, prompt_str=None, phase='train', format_mode='R1'):
+    format_score = format_reward(solution_str, prompt_str, format_mode=format_mode)
     if data_source == 'openai/gsm8k':
         from . import gsm8k
         res = gsm8k.compute_score(solution_str, ground_truth)
