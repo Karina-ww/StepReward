@@ -1,6 +1,6 @@
 <div align="center">
 
-# RLPR: Scaling RLVR To General Domain
+# RLPR: Extrapolating RLVR To General Domain
 
 </div>
 
@@ -47,7 +47,7 @@ We introduce the RLPR (Reinforcement Learning with Reference Probability Reward)
 
 ## 📌Contents <!-- omit in toc -->
 
-- [RLPR: Scaling RLVR To General Domain](#rlpr-scaling-rlvr-to-general-domain)
+- [RLPR: Extrapolating RLVR To General Domain](#rlpr-extrapolating-rlvr-to-general-domain)
   - [Dataset](#dataset)
   - [Install](#install)
   - [Train](#train)
@@ -84,12 +84,12 @@ bash setup_env.sh
 
 Download the [train](https://huggingface.co/) and [test](https://huggingface.co/) dataset. Move `rlpr_train.parquet` to `./datasets/train`, and move all the test datasets to `./datasets/test`.
 
-1. Specify the base model path `examples/scalable_rl/reproduce.sh`.
+1. Specify the base model path `examples/RLPR/reproduce.sh`.
 ```bash
 MODEL=path_to_base_model
 ```
 
-1. (Optional) Login wandb and set USE_WANDB to True in the `examples/scalable_rl/reproduce.sh` if you want to use wandb for logging.
+1. (Optional) Login wandb and set USE_WANDB to True in the `examples/RLPR/reproduce.sh` if you want to use wandb for logging.
 
 ```bash
 : "${USE_WANDB:=true}"
@@ -103,7 +103,7 @@ MODEL=path_to_base_model
 	        bash setup_server.sh
 	        ```
 	        
-	    2. Specify the judge model in the `examples/scalable_rl/reproduce.sh`.
+	    2. Specify the judge model in the `examples/RLPR/reproduce.sh`.
 	        
 	        ```shell
 	        export CLIENT_IP=http://127.0.0.1:8001
@@ -111,7 +111,7 @@ MODEL=path_to_base_model
 	        ```
 	- API-Based Model (gpt-4o / 4pt-4.1) as judge 
 		
-        Specify token and the judge model in the `examples/scalable_rl/reproduce.sh` to use OpenAI API.
+        Specify token and the judge model in the `examples/RLPR/reproduce.sh` to use OpenAI API.
         
         ```shell
         export OPENAI_API_KEY=your_api_token
@@ -122,7 +122,7 @@ MODEL=path_to_base_model
 5. Run the training script
 
 ```shell
-bash examples/scalable_rl/reproduce.sh
+bash examples/RLPR/reproduce.sh
 ```
 
 ## Evaluation
@@ -132,7 +132,7 @@ bash examples/scalable_rl/reproduce.sh
 2. Run the evaluation script
 
 ```shell
-bash examples/scalable_rl/reproduce.sh +trainer.val_only=True
+bash examples/RLPR/reproduce.sh +trainer.val_only=True
 ```
 
 ## Licenses <!-- omit in toc -->

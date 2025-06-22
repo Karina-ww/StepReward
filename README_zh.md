@@ -1,6 +1,6 @@
 <div align="center">
 
-# RLPR: Scaling RLVR To General Domain
+# RLPR: Extrapolating RLVR To General Domain
 
 </div>
 
@@ -45,7 +45,7 @@
 
 ## 📌 目录 <!-- omit in toc -->
 
-- [RLPR: Scaling RLVR To General Domain](#rlpr-scaling-rlvr-to-general-domain)
+- [RLPR: Extrapolating RLVR To General Domain](#rlpr-extrapolating-rlvr-to-general-domain)
   - [数据集](#数据集)
   - [安装](#安装)
   - [训练](#训练)
@@ -81,12 +81,12 @@
 
     下载[训练](https://huggingface.co/)和[测试](https://huggingface.co/)数据集。将 `rlpr_train.parquet` 移动到 `./datasets/train` 目录下，并将所有测试数据集移动到 `./datasets/test` 目录下。
 
-2.  在 `examples/scalable_rl/reproduce.sh` 中指定基座模型路径。
+2.  在 `examples/RLPR/reproduce.sh` 中指定基座模型路径。
     ```bash
     MODEL=path_to_base_model
     ```
 
-3.  (可选) 如果您想使用 wandb 进行日志记录，请登录 wandb 并在 `examples/scalable_rl/reproduce.sh` 中将 `USE_WANDB` 设置为 `True`。
+3.  (可选) 如果您想使用 wandb 进行日志记录，请登录 wandb 并在 `examples/RLPR/reproduce.sh` 中将 `USE_WANDB` 设置为 `True`。
 
     ```bash
     : "${USE_WANDB:=true}"
@@ -100,7 +100,7 @@
             bash setup_server.sh
             ```
 
-        2.  在 `examples/scalable_rl/reproduce.sh` 中指定评估模型。
+        2.  在 `examples/RLPR/reproduce.sh` 中指定评估模型。
 
             ```shell
             export CLIENT_IP=http://127.0.0.1:8001
@@ -108,7 +108,7 @@
             ```
     *   基于 API 的模型 (gpt-4o / gpt-4.1) 作为评估
 
-        在 `examples/scalable_rl/reproduce.sh` 中设置token和评估模型以使用 OpenAI API。
+        在 `examples/RLPR/reproduce.sh` 中设置token和评估模型以使用 OpenAI API。
 
         ```shell
         export OPENAI_API_KEY=your_api_token
@@ -119,7 +119,7 @@
 5.  运行训练脚本
 
     ```shell
-    bash examples/scalable_rl/reproduce.sh
+    bash examples/RLPR/reproduce.sh
     ```
 
 ## 评估
@@ -129,7 +129,7 @@
 2.  运行评估脚本
 
     ```shell
-    bash examples/scalable_rl/reproduce.sh +trainer.val_only=True
+    bash examples/RLPR/reproduce.sh +trainer.val_only=True
     ```
 
 ## 许可证 <!-- omit in toc -->
