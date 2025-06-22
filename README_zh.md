@@ -1,6 +1,10 @@
-<div align="center" style="font-size: 15pt">
+<div align="center">
 
-**RLPR：将RLVR扩展至通用领域**
+# RLPR: Scaling RLVR To General Domain
+
+</div>
+
+<div align="center" style="font-size: 15pt">
 
 <a href='https://arxiv.org'><img src='https://img.shields.io/badge/Paper-PDF-purple'></a>
 <a href='https://huggingface.co/datasets'><img src='https://img.shields.io/badge/Dataset-HF-Green'></a>
@@ -41,11 +45,12 @@
 
 ## 📌 目录 <!-- omit in toc -->
 
-- [数据集](#数据集)
-- [安装](#安装)
-- [训练](#训练)
-- [评估](#评估)
-- [引用](#引用)
+- [RLPR: Scaling RLVR To General Domain](#rlpr-scaling-rlvr-to-general-domain)
+  - [数据集](#数据集)
+  - [安装](#安装)
+  - [训练](#训练)
+  - [评估](#评估)
+  - [引用](#引用)
 
 ## 数据集
 

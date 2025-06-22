@@ -1,7 +1,10 @@
+<div align="center">
+
+# RLPR: Scaling RLVR To General Domain
+
+</div>
 
 <div align="center" style="font-size: 15pt">
-
-**RLPR: Scaling RLVR To General Domain**
 
 <a href='https://arxiv.org'><img src='https://img.shields.io/badge/Paper-PDF-purple'></a>
 <a href='https://huggingface.co/datasets'><img src='https://img.shields.io/badge/Dataset-HF-Green'></a>
@@ -44,11 +47,12 @@ We introduce the RLPR (Reinforcement Learning with Reference Probability Reward)
 
 ## ðŸ“ŒContents <!-- omit in toc -->
 
-- [Dataset](#dataset)
-- [Install](#install)
-- [Train](#train)
-- [Evaluation](#evaluation)
-- [Citation](#citation)
+- [RLPR: Scaling RLVR To General Domain](#rlpr-scaling-rlvr-to-general-domain)
+  - [Dataset](#dataset)
+  - [Install](#install)
+  - [Train](#train)
+  - [Evaluation](#evaluation)
+  - [Citation](#citation)
 
 ## Dataset
 
@@ -157,5 +161,4 @@ If you find our model/code/data/paper helpful, please consider cite our papers ð
   journal={arXiv preprint arXiv:2506.xxxxx},
   year={2025}
 }
-```# RLPR
-# RLPR
+```
