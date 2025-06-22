@@ -123,7 +123,9 @@ USE_WANDB=${USE_WANDB:-"false"}
 5. Run the training script
 
 ```shell
-bash examples/RLPR/reproduce.sh
+bash examples/RLPR/reproduce_qwen.sh
+# bash examples/RLPR/reproduce_llama.sh
+# bash examples/RLPR/reproduce_gemma.sh
 ```
 
 ## Evaluation
@@ -133,7 +135,9 @@ bash examples/RLPR/reproduce.sh
 2. Run the evaluation script
 
 ```shell
-bash examples/RLPR/reproduce.sh +trainer.val_only=True
+bash examples/RLPR/reproduce_qwen.sh +trainer.val_only=True
+# bash examples/RLPR/reproduce_llama.sh +trainer.val_only=True
+# bash examples/RLPR/reproduce_gemma.sh +trainer.val_only=True
 ```
 
 ## Licenses <!-- omit in toc -->

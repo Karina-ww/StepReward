@@ -16,8 +16,7 @@ N_GPUS_PER_NODE=8
 # Rule as Judge (Default)
 unset OPENAI_API_KEY
 unset OPENAI_API_BASE
-unset CLIENT_IP
-export USED_MODEL=no_api
+export USED_MODEL=${USED_MODEL:-"no_api"}
 
 # # OpenSouce Model as Judge
 # export USED_MODEL=Qwen/Qwen2.5-72B-Instruct
@@ -31,17 +30,16 @@ export USED_MODEL=no_api
 
 # Train and Validation Files
 TRAIN_FILES=./datasets/train/rlpr_train.parquet
-VAL_DIR=./datasets/test
+VAL_DIR=${VAL_DIR:-"./datasets/test"}
 VAL_FILES=[${VAL_DIR}'/MMLUPro-1000_Avg2.parquet',${VAL_DIR}'/Math-500_Avg2.parquet',${VAL_DIR}'/gpqa_diamond_Avg4.parquet',${VAL_DIR}'/AIME2024_Avg16.parquet',${VAL_DIR}'/WebInstruct-verified-val_Avg2.parquet',${VAL_DIR}'/Minerva_Avg4.parquet',${VAL_DIR}'/TheoremQA_Avg2.parquet']
 
-
 # Logging and Checkpointing
-export LOGS_PATH=./data/logs
+export LOGS_PATH=data/logs
 export TENSORBOARD_DIR=./tensorboard
 mkdir -p "${TENSORBOARD_DIR}"
-VAL_SAVE_RESULTS_DIR=./data/logs/test_generations_${EXP_NAME}
+VAL_SAVE_RESULTS_DIR=data/logs/test_generations_${EXP_NAME}
 mkdir -p "${VAL_SAVE_RESULTS_DIR}"
-LOCAL_DIR=./data/checkpoints/${EXP_NAME}
+LOCAL_DIR=data/checkpoints/${EXP_NAME}
 mkdir -p "${LOCAL_DIR}"
 
 # --- Conditional WandB Setup ---
@@ -59,7 +57,6 @@ if [ "$USE_WANDB" = "true" ]; then
     TRAINER_LOGGER_CONFIG="['console','wandb']"
     WANDB_PARAMETERS=(
         "trainer.project_name=$WANDB_PRJ_NAME"
-        "trainer.experiment_name=$EXP_NAME"
         "trainer.val_generations_to_log_to_wandb=10"
         "+trainer.train_generations_to_log_to_wandb=1"
         "+trainer.train_generations_to_log_to_wandb_2=50"
@@ -101,6 +98,8 @@ python -m verl.trainer.main_ppo \
     +data.accuracy_lower_bound_ratio=0.5 \
     +data.accuracy_upper_bound=1000000 \
     +data.filter_cache_regenerate=True \
+    actor_rollout_ref.rollout.temperature=0.6 \
+    actor_rollout_ref.rollout.top_p=0.95 \
     actor_rollout_ref.model.path=$MODEL \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
@@ -123,6 +122,7 @@ python -m verl.trainer.main_ppo \
     algorithm.kl_ctrl.kl_coef=$KL_COEF \
     trainer.critic_warmup=0 \
     trainer.logger=${TRAINER_LOGGER_CONFIG} \
+    trainer.experiment_name=$EXP_NAME \
     "${WANDB_PARAMETERS[@]}" \
     +trainer.val_before_train=True \
     trainer.n_gpus_per_node=${N_GPUS_PER_NODE} \
@@ -140,4 +140,5 @@ python -m verl.trainer.main_ppo \
     +reward_model.optimize_think_only=False \
     +reward_model.repetition_penalty=True \
     +reward_model.val_reward_manager=naive \
+    +reward_model.format_mode=answer \
     "$@"
