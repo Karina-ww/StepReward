@@ -28,22 +28,24 @@
 
 We introduce the RLPR (Reinforcement Learning with Reference Probability Reward) framework that enhances the reasoning capabilities of Large Language Models (LLMs). RLPR uses LLM's generation probabilities as a reward signal and eliminates reliance of external verifiers. This approach enables robust, general-domain reasoning improvements with greater efficiency and broader applicability. Notable features of RLPR include:
 
-* 💡 **Stronger Reasoning Enhancement**. 
+💡 **Stronger Reasoning Enhancement**. 
 	RLPR achieves better reasoning capability enchancement on both mathematical and general-domain reasoning benchmarks, even surpassing strong methods using verifier models.
 
 <div align="center"> <img src="assets/performance_fig1.png" width = 80% /> </div>
 
-* 🛠️ **Simple and Scalable Reward**.
+🛠️ **Simple and Scalable Reward**.
     RLPR features an efficient Probability-based Reward (PR) using average decoding probabilities of reference answers. Without the need for laborious rule-based verifier construction, we simply calculate rewards with a single forward pass. 
 
 <div align="center"> <img src="assets/framework.png" width = 80% /> </div>
 
-* 🚀 **Better Reward Quality and Robust Training**.
-    PR exhibits better reward quality compared with rule-based, model-based reward, and naive likelihood as a reward. 
+🚀 **Better Reward Quality and Robust Training**.
+    
+PR exhibits better reward quality compared with rule-based, model-based reward, and naive likelihood as a reward. 
 
 <div align="center"> <img src="assets/PR_quality.png" width = 50% /> </div> 
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; We apply RLPR with different training prompt templates  and find it achieves robustness reasoning capability enhancement. <div align="center"> <img src="assets/robustness.png" width = 80% /> </div>
+We apply RLPR with different training prompt templates  and find it achieves robustness reasoning capability enhancement.
+<div align="center"> <img src="assets/robustness.png" width = 80% /> </div>
 
 
 

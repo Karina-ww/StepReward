@@ -26,22 +26,23 @@
 
 我们提出了 RLPR (Reinforcement Learning with Reference Probability Reward) 框架，以增强大语言模型 (LLM) 的推理能力。RLPR 使用 LLM 的生成概率作为奖励信号，消除了对外部验证器的依赖。这种方法能够以更高的效率和更广泛的适用性，在通用领域实现稳健的推理能力提升。RLPR 的显著特点包括：
 
-* 💡 **更出色的推理增强**。
+💡 **更出色的推理增强**。
     RLPR 在数学和通用领域推理基准测试中均取得了更优秀的推理能力增强效果，甚至超越了使用验证器模型的方法。
 
 <div align="center"> <img src="assets/performance_fig1.png" width = 80% /> </div>
 
-* 🛠️ **简单且可扩展的奖励机制**。
+🛠️ **简单且可扩展的奖励机制**。
     RLPR 采用了一种高效的基于概率的奖励 (PR) 机制，其使用参考答案的平均解码概率。我们只需通过单次前向传播即可计算奖励，而无需费力构建基于规则的验证器。
 
 <div align="center"> <img src="assets/framework.png" width = 80% /> </div>
 
-* 🚀 **更高的奖励质量和稳健的训练效果**。
-    与基于规则、基于模型的奖励以及朴素似然作为奖励相比，PR展现出更高的奖励质量。
-    <div align="center"> <img src="assets/PR_quality.png" width = 50% /> </div>
+🚀 **更高的奖励质量和稳健的训练效果**。
 
-    我们测试了不同的训练提示词，发现 RLPR 均能实现稳健的推理能力增强。
-    <div align="center"> <img src="assets/robustness.png" width = 80% /> </div>
+与基于规则、基于模型的奖励以及朴素似然作为奖励相比，PR展现出更高的奖励质量。
+<div align="center"> <img src="assets/PR_quality.png" width = 50% /> </div>
+
+我们测试了不同的训练提示词，发现 RLPR 均能实现稳健的推理能力增强。
+<div align="center"> <img src="assets/robustness.png" width = 80% /> </div>
 
 
 ## 📌 目录 <!-- omit in toc -->
