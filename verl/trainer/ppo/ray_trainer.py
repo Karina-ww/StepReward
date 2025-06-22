@@ -938,8 +938,8 @@ class RayPPOTrainer(object):
         plt.close()
 
         
-        # Save histogram to /data/logs/val_results
-        save_dir = "/data/logs/val_results"
+        # Save histogram to ./data/logs/val_results
+        save_dir = "./data/logs/val_results"
         os.makedirs(save_dir, exist_ok=True)
         os.makedirs(os.path.join(save_dir, histogram_name.split('/')[0]), exist_ok=True)
         
@@ -1027,10 +1027,6 @@ class RayPPOTrainer(object):
                 print(f'\n## validating {val_name} ##\n')
                 for test_data in val_dataloader:
                     test_batch = DataProto.from_single_dict(test_data)
-                    debug = False
-                    if debug:
-                        print(f"{idx=} In validation: {test_batch=}", flush=True) # bs=1021
-                        print(f"{idx=} {self.actor_rollout_wg.world_size=}")
 
                     # we only do validation on rule-based rm
                     if self.config.reward_model.enable and test_batch[0].non_tensor_batch['reward_model']['style'] == 'model':
@@ -1073,12 +1069,6 @@ class RayPPOTrainer(object):
                     # pad to be divisible by dp_size
                     test_gen_batch_padded, pad_size = pad_dataproto_to_divisor(test_gen_batch, self.actor_rollout_wg.world_size)
 
-                    debug = False
-                    if debug:
-                        print(f"{test_gen_batch_padded=}")
-                        print(f"{pad_size=}")
-                        print(f"{self.actor_rollout_wg.world_size=}")
-                    
                     test_output_gen_batch_padded = self.actor_rollout_wg.generate_sequences(test_gen_batch_padded)
                     test_output_gen_batch = unpad_dataproto(test_output_gen_batch_padded, pad_size=pad_size * n)
 
@@ -1581,7 +1571,6 @@ class RayPPOTrainer(object):
                                         else:
                                             print('Encounter NaN or Inf std!', flush=True)
                                 print(f"{ema_mean=} for {self.global_steps=}")
-                                print(f"For debugging: {self.calculate_ema(score_std_list, self.config.data.filter_ema_ratio)=}")
                                 
                                 self.config.data.accuracy_lower_bound = ema_mean * self.config.data.accuracy_lower_bound_ratio
                             score_std_list.append([])
@@ -2252,51 +2241,34 @@ class RayPPOTrainer(object):
         max_prompt_length, max_response_length = self.config.data.max_prompt_length, self.config.data.max_response_length
         data_list = []
         prompt_str_list, ground_truth_list = [], []
-        add_answer_tags = False
-        if add_answer_tags:
-            start_answer, end_answer = '<answer>', '</answer>'
         for i in range(len(batch_input_ids)):
             data_item = data[i]
             ground_truth = data_item.non_tensor_batch['reward_model']['ground_truth']
 
             prompt_str = self.tokenizer.decode(batch_input_ids[i], skip_special_tokens=False)
-            if add_answer_tags:
-                new_text = prompt_str + ' ' + start_answer + ' ' + ground_truth + ' ' + end_answer + ' ' + eos_token_str
-            else:
-                new_text = prompt_str + ' ' + ground_truth + ' ' + eos_token_str
+            new_text = prompt_str + ' ' + ground_truth + ' ' + eos_token_str
             new_text_rmpad = new_text.replace(self.tokenizer.pad_token, '')
             if eos_token_str not in new_text_rmpad: # For a base model, the eos_token_str is the same as pad_token_str
                 new_text_rmpad += eos_token_str
             outputs = self.tokenizer(new_text_rmpad, return_tensors='pt', add_special_tokens=False)
             input_ids = outputs['input_ids']
             attention_mask = outputs['attention_mask']
-            if add_answer_tags:
-                sep_str = start_answer
+            if '<｜Assistant｜><think>' in self.tokenizer.chat_template:
+                sep_str = '<｜Assistant｜><think>' + '\n'
+            elif '<｜Assistant｜>' in self.tokenizer.chat_template:
+                sep_str = '<｜Assistant｜>' + '\n'
             else:
-                if '<｜Assistant｜><think>' in self.tokenizer.chat_template:
-                    sep_str = '<｜Assistant｜><think>' + '\n'
-                elif '<｜Assistant｜>' in self.tokenizer.chat_template:
-                    sep_str = '<｜Assistant｜>' + '\n'
-                else:
-                    sep_str = '<|im_start|>assistant' + '\n'
+                sep_str = '<|im_start|>assistant' + '\n'
             pos = self.locate_substring_tokens(new_text_rmpad, sep_str, self.tokenizer)
 
             prompts = input_ids[:, :pos[-1] + 1]
             responses = input_ids[:, pos[-1] + 1:]
-
-
-
-            if add_answer_tags:
-                debug_pos_eos = self.locate_substring_tokens(new_text_rmpad, end_answer, self.tokenizer) # list
-            else:
-                debug_pos_eos = self.locate_substring_tokens(new_text_rmpad, eos_token_str, self.tokenizer) # list
 
             pos_gt = self.locate_substring_tokens(new_text_rmpad, ground_truth, self.tokenizer, ignore_end_text=eos_token_str) # list
             # Note that if GT is empty, this will report errors.
             ground_truth_ids = input_ids[:, pos_gt[0]:pos_gt[-1] + 1]
             start = (pos_gt[0]) - (pos[-1] + 1)
 
-            debug_ground_truth_ids = input_ids[:, prompts.shape[1]:debug_pos_eos[0]]
 
             # Pad prompts and responses for future packing
             left_pad_tuple = (max_prompt_length- prompts.shape[-1], 0)
@@ -2851,26 +2823,26 @@ class RayPPOTrainer(object):
                 ground_truth_mask[:, start:start + ground_truth_ids.shape[-1]] = 1 # Suppose the response is <think> ABC </think> <answer> DEF </answer>. Then the mask is on " DEF ".
 
 
-            if ii % 100 == 0:
-                print(f"{new_text=}")
-                print(f"{ground_truth_ids=}")# tensor([[ 5672, 12738, 26278]])
-                print(f"{valid_flag=}")
-                response_mask_prob_shift_left = torch.zeros_like(gen_responses[ii])
-                response_mask_prob_shift_left[:response_mask_prob_length-1] = 1
-                response_mask_prob_shift_right = torch.zeros_like(gen_responses[ii])
-                response_mask_prob_shift_right[:response_mask_prob_length+1] = 1
-                print(f"Original response (shifted left) that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_prob_shift_left.bool()])=}") # '<think> The question is asking for ...  it. </think'
-                print(f"Original response that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_prob.bool()])=}") # '<think> The question is asking about the architect who designed the Shard Building, which is the tallest building in London. I need to recall the architect associated with this major landmark. \n\nThe Shard in London is designed by architect Renzo Piano. </think>\n\n'
-                print(f"Original response (shifted right) that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_prob_shift_right.bool()])=}") # '<think> The question is asking for ... it. </think>\n\n<'
-                print(f"Original response || {self.tokenizer.decode(gen_responses[ii]).replace(pad_token_str, '')=}") # '<think> The question is asking about the architect who designed the Shard Building, which is the tallest building in London. I need to recall the architect associated with this major landmark. \n\nThe Shard in London is designed by architect Renzo Piano. </think>\n\n<answer> The architect who designed the Shard Building in London is Renzo Piano. </answer><|im_end|>
-                print(f"New Prompt || {self.tokenizer.decode(prompts[0], skip_special_tokens=True)=}")# 'system\nA conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think> <answer> answer here </answer>.\nuser\nPlease answer this question: Which architect designed the 87-storey Shard Building in London?\nassistant\n<think> The question is asking for the architect of the Shard Building in London. I will need to recall information about famous architecture in London and the Shard Building specifically.\n\nThe Shard Building in London was designed by the Italian architect Renzo Piano. \n\n </think>'
-                print(f"New Response || {self.tokenizer.decode(responses[0], skip_special_tokens=True)=}") # ' <answer> renzo piano </answer>'
+            # if ii % 100 == 0:
+            #     print(f"{new_text=}")
+            #     print(f"{ground_truth_ids=}")# tensor([[ 5672, 12738, 26278]])
+            #     print(f"{valid_flag=}")
+            #     response_mask_prob_shift_left = torch.zeros_like(gen_responses[ii])
+            #     response_mask_prob_shift_left[:response_mask_prob_length-1] = 1
+            #     response_mask_prob_shift_right = torch.zeros_like(gen_responses[ii])
+            #     response_mask_prob_shift_right[:response_mask_prob_length+1] = 1
+            #     print(f"Original response (shifted left) that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_prob_shift_left.bool()])=}") # '<think> The question is asking for ...  it. </think'
+            #     print(f"Original response that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_prob.bool()])=}") # '<think> The question is asking about the architect who designed the Shard Building, which is the tallest building in London. I need to recall the architect associated with this major landmark. \n\nThe Shard in London is designed by architect Renzo Piano. </think>\n\n'
+            #     print(f"Original response (shifted right) that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_prob_shift_right.bool()])=}") # '<think> The question is asking for ... it. </think>\n\n<'
+            #     print(f"Original response || {self.tokenizer.decode(gen_responses[ii]).replace(pad_token_str, '')=}") # '<think> The question is asking about the architect who designed the Shard Building, which is the tallest building in London. I need to recall the architect associated with this major landmark. \n\nThe Shard in London is designed by architect Renzo Piano. </think>\n\n<answer> The architect who designed the Shard Building in London is Renzo Piano. </answer><|im_end|>
+            #     print(f"New Prompt || {self.tokenizer.decode(prompts[0], skip_special_tokens=True)=}")# 'system\nA conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think> <answer> answer here </answer>.\nuser\nPlease answer this question: Which architect designed the 87-storey Shard Building in London?\nassistant\n<think> The question is asking for the architect of the Shard Building in London. I will need to recall information about famous architecture in London and the Shard Building specifically.\n\nThe Shard Building in London was designed by the Italian architect Renzo Piano. \n\n </think>'
+            #     print(f"New Response || {self.tokenizer.decode(responses[0], skip_special_tokens=True)=}") # ' <answer> renzo piano </answer>'
 
-                print(f"Ground-truth in the new response || {self.tokenizer.decode(responses[ground_truth_mask.bool()], skip_special_tokens=False)=}") # ' renzo piano'
+            #     print(f"Ground-truth in the new response || {self.tokenizer.decode(responses[ground_truth_mask.bool()], skip_special_tokens=False)=}") # ' renzo piano'
 
-                original_response_mask = gen_batch_output.batch['attention_mask'][:, -gen_responses.size(1):] # This will be originally used in updating actor
-                print(f"Original response || {self.tokenizer.decode(gen_responses[ii][original_response_mask[ii].bool()])=}")  # <think> I need to remember that these seem to be names, and I should use a translation tool or my own knowledge of languages to translate them. Unfortunately, as a text-based AI, I might not be able to accurately translate names from one language to another. However, given my own knowledge, it could seem like these are Indian names, with both likely being given names. </think>\n<answer> Tandon, Ravana </answer><|im_end|>
-                print('-'*50)
+            #     original_response_mask = gen_batch_output.batch['attention_mask'][:, -gen_responses.size(1):] # This will be originally used in updating actor
+            #     print(f"Original response || {self.tokenizer.decode(gen_responses[ii][original_response_mask[ii].bool()])=}")  # <think> I need to remember that these seem to be names, and I should use a translation tool or my own knowledge of languages to translate them. Unfortunately, as a text-based AI, I might not be able to accurately translate names from one language to another. However, given my own knowledge, it could seem like these are Indian names, with both likely being given names. </think>\n<answer> Tandon, Ravana </answer><|im_end|>
+            #     print('-'*50)
  
 
             row_dict = {
@@ -3128,7 +3100,7 @@ class RayPPOTrainer(object):
         df.sort_values('uid', inplace=True)
 
         # Create directory if it doesn't exist
-        save_path = f"/data/logs/train_generations/{self.config.trainer.experiment_name}_step{self.global_steps}.csv"
+        save_path = f"./data/logs/train_generations/{self.config.trainer.experiment_name}_step{self.global_steps}.csv"
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         
         # Save to CSV
@@ -3232,7 +3204,7 @@ class RayPPOTrainer(object):
             if idx >= len(self.train_dataloader) + 4:
                 break
 
-        save_path = '/data/logs/promptgt2scoreA.json'
+        save_path = './data/logs/promptgt2scoreA.json'
         with open(save_path, 'w') as file:
             print(f"We dump to {save_path}")
             json.dump(promptgt2scoreA, file)
@@ -3277,7 +3249,7 @@ class RayPPOTrainer(object):
             })
         
         # Create directory if it doesn't exist
-        save_path = f"/data/logs/rollout/{self.config.trainer.experiment_name}_step{self.global_steps}.csv"
+        save_path = f"./data/logs/rollout/{self.config.trainer.experiment_name}_step{self.global_steps}.csv"
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         
         df = pd.DataFrame(results)
@@ -3422,9 +3394,6 @@ class RayPPOTrainer(object):
             float: Mean of the matching values
         """
         result = {}
-        debug = True
-        if debug:
-            print(metrics.keys())
         for prefix, postfix in [('rewards', '/std_per_group/mean'), ('rewards', '/mean_per_group/mean'), ('scoreB', 'mean')]:
             total = 0.0
             count = 0
