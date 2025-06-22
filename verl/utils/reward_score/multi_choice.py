@@ -26,8 +26,6 @@ def first_option_postprocess(text: str, options: str, cushion=True) -> str:
         f'<answer>\s*([{options}])\s*</answer>', # '<answer>C</answer>'
         f'(?i)ANSWER\s*:\s*([{options}])',
         f'(?i)ANSWER\s*:\s*\(([{options}])\)',
-        # f'is:?\s+\(?([{options}])\)?', # the false statement is:\n\nC. xxx
-        # f'是:?\s+\(?([{options}])\)?',
         f'答案是?\s*([{options}])',
         f'答案是?\s*：\s*([{options}])',
         f'答案是?\s*:\s*([{options}])',
@@ -81,8 +79,6 @@ def first_option_postprocess(text: str, options: str, cushion=True) -> str:
         f'故此为\s*([{options}])',
     ]
     cushion_patterns = [
-        # f'([{options}]):',
-        # f'([{options}])',
     ]
     
     # flake8: noqa
@@ -101,10 +97,6 @@ def first_option_postprocess(text: str, options: str, cushion=True) -> str:
         match = re.findall(pattern, text, re.DOTALL)
         
         if match:
-            # if match.group(1) is not None and match.group(1) != '':
-            #     outputs = match.group(1)
-            # else:
-            #     outputs = match.group(0)
             if match[-1] is not None and match[-1] != '':
                 outputs = match[-1]
             else:
@@ -113,30 +105,16 @@ def first_option_postprocess(text: str, options: str, cushion=True) -> str:
                 if i in outputs: # 5.0 \\text{ J/K}
                     return i
     return 'not-macthed'
-    for t in text:
-        if t.isupper() and t in options:
-            return t
-        elif t.islower() and t in options.lower():
-            return t.upper()
-    text = text.strip()
-    if text and text[0] in options:
-        return text[0]
-    elif text[0] == '(' and text[2] == ')' and text[1].upper() in options:
-        return text[1].upper()
 
-    return ''
 
 
 def match_answer_pattern(response_text: str, answer_pattern: str):
-    # match = re.search(answer_pattern, response_text)
-    # extracted_answer = match.group(1) if match else ''
     match = re.findall(answer_pattern, response_text, re.DOTALL)
     extracted_answer = match[-1] if match else ''
     return extracted_answer
 
 
 def extract_last_answer(text):
-    # Find all occurrences of <answer>...</answer>
     answers = re.findall(r'<answer>(.*?)</answer>', text, re.DOTALL)
     
     if answers:
@@ -175,7 +153,6 @@ def extract_option(prompt_str, ground_truth):
     # Search for the option in the prompt
     match = pattern.search(prompt_str)
     if match:
-        # return match.group(2).strip()
         res = match.group(2).replace('<|im_end|>', '').strip()
         return res
     
@@ -198,12 +175,10 @@ def extract_option(prompt_str, ground_truth):
 def direct_match_mcq(output, gt_option, gt_full='None'):
     assert gt_option in 'ABCDEFGHIJKLMNOP'
     
-    # gt_full = gt_full.replace('$', '')
-
     end = r')[\s\.\}]'
     patterns = [
         r'boxed\{\s*(' + re.escape(gt_option) + end,
-        r'boxed\{\s*(' + re.escape(gt_full) + end, # We comment for now
+        r'boxed\{\s*(' + re.escape(gt_full) + end, 
 
         r'boxed\{\s*' + re.escape('\\text{')+ '(' + re.escape(gt_option) +  r')[\s\.\}]', # '\\boxed{\\text{A}}', '\\boxed{\\text{A.}}', '\\boxed{\\text{A   }}'
 
@@ -211,7 +186,6 @@ def direct_match_mcq(output, gt_option, gt_full='None'):
         r'<answer>\s*(' + re.escape(gt_full) + r')\s*</answer>',
         r'<answer>\s*(' + re.escape(gt_full) + r')[\s\.]', # to capture the case when '''/think>\n<answer>A. 9.1445 x 10^-27 J T-1</answer>''' if the GT is "A".
 
-        # r'boxed\{\s*(' + re.escape(gt_full) + end, # We comment for now
         r'ANSWER:\s*(' +  re.escape(gt_option) + r')',
         r'Answer:\s*(' +  re.escape(gt_option) + r')',
         r'he answer to the question is:?\s*(' + re.escape(gt_option) + r')',
@@ -228,17 +202,12 @@ def direct_match_mcq(output, gt_option, gt_full='None'):
         try:
             match = re.search(pattern, output, re.DOTALL)
             if match and match.group(1) is not None and match.group(1) != '':
-                # print(f"### Return direct match result: {match.group(1)} using {pattern} (The original result is {match.group(0)})")
                 return 1,  match.group(1)
         except re.error:
             print(f'\n\n\n{pattern}')
             print(output)            
             
     match = re.findall(r'boxed\{\s*(.*?)\}', output, re.DOTALL)
-    # if '2.664 × 10^10cm' in gt_full:
-    #     print(match, gt_full)
-    #     print(prime_math.compute_score(match[-1], gt_full))
-    #     exit()
     if match:
         if match[-1] is not None and match[-1] != '':
             outputs = match[-1]            
@@ -247,55 +216,17 @@ def direct_match_mcq(output, gt_option, gt_full='None'):
             # if prime match: return 1, outputs
     return None
 
-# --------------------------------------------------
-# T = - 40°C or T = - 40°F, T_R= 420, T_K= 233.33 b) TC= 160, T_F= 320 F, T_R= 780, T_K= 433.33
-# --------------------------------------------------
-# --------------------------------------------------
-# [(2e^-4s) / s^3]
-# --------------------------------------------------
-# --------------------------------------------------
-# \\frac{8}{9}
-# --------------------------------------------------
-# --------------------------------------------------
-# \\frac{161}{36}
-# --------------------------------------------------
-# --------------------------------------------------
-# PERCENT(1:8)DEC, REAL, FLOAT(6); b) AMOUNT FIXED (5) DEC, REAL; c) NUMBERFIXED(5) DEC COMPLEX; d) TOTAL FLOAT (21) BINARY REAL; e) INCANTFIXED(15) BIN, REAL;
-# --------------------------------------------------
-# --------------------------------------------------
-# \\frac{5}{12}
-# --------------------------------------------------
-# --------------------------------------------------
-# a) Decrease, b) Increase, c) Increase, d) Increase
-# --------------------------------------------------
-# --------------------------------------------------
-# \\frac{8}{45}
-# --------------------------------------------------
-# --------------------------------------------------
-# a) 1,357.2 Btu/hr-ft^2-°F, b) 42,638 Btu/hr, c) 41lbm/hr
-# --------------------------------------------------
-# --------------------------------------------------
-# +7.3$\\mathrm{kJ} \\mathrm{mol}^{-1}$
-# --------------------------------------------------
-
 def compute_score(model_output: str, ground_truth: str, options: str, prompt_str: str = None) -> bool:
     model_output = str(model_output)
     ground_truth = str(ground_truth).strip()
 
-    # model_output = remove_think_tags(model_output)
     if 'user\n' in model_output:
         model_output = model_output.split('user\n')[0] # avoid the issue that base model appends additional conversation
 
-    # if '<answer>' in model_output and '</answer>' in model_output:
-    #     model_output_extracted = extract_last_answer(model_output)
-    #     model_output = model_output_extracted if model_output_extracted.strip() != '' else model_output
-
-    
     direct_match_result = direct_match_mcq(model_output, gt_option=ground_truth, gt_full=extract_option(prompt_str, ground_truth))
     if direct_match_result and direct_match_result[0]:
         return direct_match_result
 
-    # extracted_answer = first_option_postprocess(model_output, options='ABCDEFGHIJKLMNOP')
     extracted_answer = first_option_postprocess(model_output, options=options)
     extracted_answer = extracted_answer.strip()
     ground_truth = ground_truth.strip()

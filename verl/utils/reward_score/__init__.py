@@ -28,7 +28,6 @@ except:
 
 used_model = os.environ.get('USED_MODEL', None) # 'gpt'
 if used_model in ['gpt-4o', 'gpt-4.1']:
-    # raise NotImplementedError("Implement your own api client")
     client = OpenAIClient(
         api_key=os.environ.get('OPENAI_API_KEY', None),
         api_base=os.environ.get('OPENAI_API_BASE', None),
@@ -102,7 +101,6 @@ def format_reward(predict_str: str, prompt_str: str) -> float:
                 return 0.0
         return 1.0
 
-    # Example prompt string: `'system\nA conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think> <answer> answer here </answer>.\nuser\nAltitudes $\\overline{AD}$ and $\\overline{BE}$ of $\\triangle ABC$ intersect at $H$.  If $\\angle BAC = 54^\\circ$ and $\\angle ABC = 52^\\circ$, then what is $\\angle AHB$?\nassistant\n'`
     if '<answer>' in prompt_str and '</answer>' in prompt_str:
         if _validate_tags(predict_str) == 0.0:
             return 0.0
@@ -170,85 +168,54 @@ def _default_compute_score(data_source, solution_str, ground_truth, extra_info=N
     else:
         flag = (res[0] != 1 or res[0] != True)
  
-    # log_count, log_max_count, set_gt = 0, 10, set()
-    if phase == 'validation':
-        # if (res[0] != 1 or res[0] != True): # and any(dataset_name in data_source for dataset_name in ["Math-500", "AMC2023", "numina_olympiads", "gpqa_diamond", "WebInstruct-verified-val", "MMLUPro", "SuperGPQA"]):
-        if flag:
-            if True:
-            # if ('Math-500' in data_source and ('SysR1' in data_source or 'Raw' in data_source)) \
-            #     or ('AMC2023' in data_source and ('SysR1' in data_source or 'Raw' in data_source)) \
-            #     or ('OlympiadBench' in data_source and ('SysR1' in data_source or 'Raw' in data_source)) \
-            #     or ('Minerva' in data_source and ('SysR1' in data_source or 'Raw' in data_source)) \
-            #     or any(dataset_name in data_source for dataset_name in ["gpqa_diamond", "WebInstruct-verified-val", "MMLUPro", "SuperGPQA", "TheoremQA"]):
-                # ('OlympiadBench' in data_source and ('SysR1' in data_source or 'Raw' in data_source)) \
-                question = get_raw_question_from_prompt(prompt_str)
-                model_response = solution_str
-                if 'user\n' in model_response:
-                    model_response = model_response.split('user\n')[0]  # # avoid the issue that base model appends additional conversation
-                if any(dataset_name in data_source for dataset_name in ["Math-500", "AMC2023", "OlympiadBench", "Minerva", "TheoremQA", "AIME2024"]):
-                    selected_prompt = math_prompt
-                elif 'gpqa_diamond' in data_source or 'WebInstruct-verified-val' in data_source or 'MMLUPro' in data_source or 'SuperGPQA' in data_source:
-                    selected_prompt = prompt
-                else:
-                    raise NotImplementedError(f"{data_source=} not in the implementation")
-                # print(f"{selected_prompt=}")
-                sent_prompt = selected_prompt.format(question=question, ground_truth=ground_truth, model_response=solution_str)
-                if used_model in ['gpt-4o', 'gpt-4.1']:
-                    try:
-                        response = client.chat_sync_retry(
-                            user_prompt=sent_prompt,
-                            # model=MODEL_GPT4o,
-                            model=used_model,
-                        )
-                    except Exception as e:
-                        response = 'Error'
-                else:
-                    response = client.chat(
-                        [
-                            {"role": "system", "content": "You are a helpful assistant."},
-                            {"role": "user", "content": sent_prompt}
-                        ],
-                        max_tokens=12288,
-                    )
-                # response = client.chat(
-                #     [
-                #         {"role": "system", "content": "You are a helpful assistant."},
-                #         {"role": "user", "content": sent_prompt}
-                #     ],
-                #     max_tokens=12288,
-                # )
-                # print(f"Response: {response}")
-                if response:
-                    if used_model in ['gpt-4o', 'gpt-4.1']:
-                        judge_response = response
-                    else:
-                        judge_response = response["choices"][0]["message"]["content"]
-                    # judge_response = response["choices"][0]["message"]["content"]
-                    extracted_option = extract_option(judge_response.lower())
-                    if extracted_option:
-                        extracted_option = extracted_option.strip().upper()
-                    correct = extracted_option and ((selected_prompt == prompt and extracted_option.lower() == str(ground_truth).lower()) or (selected_prompt == math_prompt and extracted_option == 'Y'))
-                    if correct:
-                        res = (1.0 if isinstance(res[0], (int, float)) else True, res[1])
-                        from_judge = 'model'
-                        # print('='*50)
-                        # print(f"Judge: {judge_response}")
-                        # print(f'Match a new result with the given ground truth "{repr(ground_truth)}".\nUser Prompt: {repr(sent_prompt)}')
-                        # print('='*50)
-
+    if phase == 'validation' and flag:
+        question = get_raw_question_from_prompt(prompt_str)
+        model_response = solution_str
+        if 'user\n' in model_response:
+            model_response = model_response.split('user\n')[0]  # # avoid the issue that base model appends additional conversation
+        if any(dataset_name in data_source for dataset_name in ["Math-500", "AMC2023", "OlympiadBench", "Minerva", "TheoremQA", "AIME2024"]):
+            selected_prompt = math_prompt
+        elif 'gpqa_diamond' in data_source or 'WebInstruct-verified-val' in data_source or 'MMLUPro' in data_source or 'SuperGPQA' in data_source:
+            selected_prompt = prompt
+        else:
+            raise NotImplementedError(f"{data_source=} not in the implementation")
+        sent_prompt = selected_prompt.format(question=question, ground_truth=ground_truth, model_response=solution_str)
+        if used_model in ['gpt-4o', 'gpt-4.1']:
+            try:
+                response = client.chat_sync_retry(
+                    user_prompt=sent_prompt,
+                    model=used_model,
+                )
+            except Exception as e:
+                response = 'Error'
+        else:
+            response = client.chat(
+                [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": sent_prompt}
+                ],
+                max_tokens=12288,
+            )
+        if response:
+            if used_model in ['gpt-4o', 'gpt-4.1']:
+                judge_response = response
+            else:
+                judge_response = response["choices"][0]["message"]["content"]
+            extracted_option = extract_option(judge_response.lower())
+            if extracted_option:
+                extracted_option = extracted_option.strip().upper()
+            correct = extracted_option and ((selected_prompt == prompt and extracted_option.lower() == str(ground_truth).lower()) or (selected_prompt == math_prompt and extracted_option == 'Y'))
+            if correct:
+                res = (1.0 if isinstance(res[0], (int, float)) else True, res[1])
+                from_judge = 'model'
         
 
-    if isinstance(res, (int, float, bool)):
-        assert False
-        return float(res), format_score
-    else:
-        return float(res[0]), format_score, res[1], from_judge, judge_response
+    return float(res[0]), format_score, res[1], from_judge, judge_response
 
 
 
 
 def get_raw_question_from_prompt(prompt_str):
-    # assert 'user\n' in prompt_str, "Currently we only support for Qwen series. And we have system prompt + user prompt"
     if 'user\n' in prompt_str:
         question = 'user\n'.join(prompt_str.split('user\n')[1:])
     elif 'User: ' in prompt_str:

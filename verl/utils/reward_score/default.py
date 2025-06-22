@@ -20,6 +20,7 @@ FROM: https://github.com/openai/prm800k/blob/main/prm800k/grading/grader.py
 """
 import re
 import sympy
+import math
 from pylatexenc import latex2text
 from sympy.parsing import sympy_parser
 
@@ -380,51 +381,7 @@ def match_answer(response):
     else:
         return False, ""
 
-    # is_matched = False
-    # for ans_marker in ['answer:', "answer is", "answers are"]:
-    #     ans_idx = response.lower().rfind(ans_marker)
-    #     if ans_idx != -1:
-    #         is_matched = True
-    #         response = response[ans_idx + len(ans_marker):].strip()
-    #         if response.endswith("\n"):
-    #             response = response[:-2]
 
-    # for ans_marker in ["is answer", "is the answer", "are answers", "are the answers"]:
-    #     ans_idx = response.lower().rfind(ans_marker)
-    #     if ans_idx != -1:
-    #         is_matched = True
-    #         response = response[:ans_idx].strip()
-    #         if response.endswith("\n"):
-    #             response = response[:-2]
-
-    # # Find boxed
-    # ans_boxed = _last_boxed_only_string(response)
-    # if ans_boxed:
-    #     is_matched = True
-    #     response = ans_boxed
-    # else:
-    #     is_matched = False
-
-    # what does the below do? For example : A. xxxx (Then we remove this xxxx)
-    # if ". " in response:
-    #     dot_idx = response.lower().rfind(". ")
-    #     if dot_idx != -1:
-    #         response = response[:dot_idx].strip()
-
-    # for ans_marker in ['be ', "is ", "are ", "=", ": ", "get ", 'be\n', "is\n", "are\n", ":\n", "get\n"]:
-    #     ans_idx = response.lower().rfind(ans_marker)
-    #     if ans_idx != -1:
-    #         is_matched = True
-    #         response = response[ans_idx + len(ans_marker):].strip()
-    #         if response.endswith("\n"):
-    #             response = response[:-2]
-
-    # is_matched = is_matched if any([c.isdigit() for c in response]) else False  # answer must have a digit
-    # Grade
-    return is_matched, response
-
-
-import math
 
 
 
@@ -454,21 +411,3 @@ def compute_score(model_output: str, ground_truth: str, prompt_str: str) -> bool
         return 1, extracted_answer
     else:
         return 0, extracted_answer
-    # format_correctness = "Step 2:" in model_output and "\\box" in model_output
-
-    # # grade simple algebra questions. if succeeded, return; otherwise, proceed to more complex grading
-    # if grade_answer(extracted_model_output, ground_truth):
-    #     return True, True, extracted_model_output
-
-    # try:
-    #     if "\pi" in extracted_model_output or "\pi" in ground_truth:
-    #         equivs = []
-    #         for pi in [math.pi, 3.14]:
-    #             equivs.append(math_equal(extracted_model_output, ground_truth, timeout=True, pi=pi))
-    #         is_correct = any(equivs)
-    #     else:
-    #         is_correct = math_equal(extracted_model_output, ground_truth, timeout=True)
-    # except:
-    #     is_correct = False
-
-    # return is_correct, format_correctness, extracted_model_output

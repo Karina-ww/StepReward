@@ -26,9 +26,6 @@ from sympy.parsing import sympy_parser
 from . import math_normalize
 from .grader import math_equal
 
-# import math_normalize
-# from grader import math_equal
-
 # sympy might hang -- we don't care about trying to be lenient in these cases
 BAD_SUBSTRINGS = ["^{", "^("]
 BAD_REGEXES = ["\^[0-9]+\^", "\^[0-9][0-9]+"]
@@ -444,7 +441,6 @@ def extract_last_answer(text):
     answers = re.findall(r'<answer>(.*?)</answer>', text, re.DOTALL)
     
     if answers:
-        # Return the last one found
         return answers[-1]
     else:
         return ""
@@ -472,7 +468,6 @@ def compute_score(model_output: str, ground_truth: str) -> bool:
     for extracted_model_output in extracted_model_output_list:
         # grade simple algebra questions. if succeeded, return; otherwise, proceed to more complex grading
         if grade_answer(extracted_model_output, ground_truth):
-            # return True, True, extracted_model_output
             return True, extracted_model_output
 
         try:
@@ -488,5 +483,4 @@ def compute_score(model_output: str, ground_truth: str) -> bool:
         if is_correct:
             return True, extracted_model_output
 
-    # return is_correct, format_correctness, extracted_model_output
     return is_correct, extracted_model_output

@@ -2,14 +2,14 @@ set -x
 
 # --- Control WandB Usage ---
 # Set USE_WANDB to "false" to disable WandB logging.
-: "${USE_WANDB:=false}"
+# : "${USE_WANDB:=false}"
+USE_WANDB=${USE_WANDB:-"false"}
 
 # Basic Project Settings
-WANDB_PRJ_NAME=scalable_rl
+WANDB_PRJ_NAME=rlpr
 EXP_NAME=reproduce
 MODEL=path_to_base_model
-export CUDA_VISIBLE_DEVICES=0,1,2,3
-N_GPUS_PER_NODE=4
+N_GPUS_PER_NODE=8
 
 # Judge Settings
 # You can choose one of the following options:

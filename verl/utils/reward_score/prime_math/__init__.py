@@ -25,15 +25,6 @@ from sympy.parsing import sympy_parser
 
 from . import math_normalize
 from .grader import math_equal
-# try:
-#     from . import math_normalize
-#     from .grader import math_equal
-# except:
-#     import math_normalize
-#     from grader import math_equal
-
-# import math_normalize
-# from grader import math_equal
 
 # sympy might hang -- we don't care about trying to be lenient in these cases
 BAD_SUBSTRINGS = ["^{", "^("]
@@ -484,17 +475,6 @@ def direct_match_mcq(output, gt):
             print(f'\n\n\n{pattern}')
             print(output)            
             
-    # match = re.findall(r'boxed\{\s*(.*?)\}', output, re.DOTALL)
-    # # if '2.664 × 10^10cm' in gt_full:
-    # #     print(match, gt_full)
-    # #     print(prime_math.compute_score(match[-1], gt_full))
-    # #     exit()
-    # if match:
-    #     if match[-1] is not None and match[-1] != '':
-    #         outputs = match[-1]            
-    #         res = prime_math.compute_score(outputs, gt_full)
-    #         return res
-            # if prime match: return 1, outputs
     return None
 
 def compute_score(model_output: str, ground_truth: str) -> bool:
@@ -517,7 +497,6 @@ def compute_score(model_output: str, ground_truth: str) -> bool:
     for extracted_model_output in extracted_model_output_list:
         # grade simple algebra questions. if succeeded, return; otherwise, proceed to more complex grading
         if grade_answer(extracted_model_output, ground_truth):
-            # return True, True, extracted_model_output
             return True, extracted_model_output
 
         try:
@@ -533,73 +512,5 @@ def compute_score(model_output: str, ground_truth: str) -> bool:
         if is_correct:
             return True, extracted_model_output
 
-    # return is_correct, format_correctness, extracted_model_output
     return is_correct, extracted_model_output
 
-
-#%%
-# if __name__ == '__main__':
-#     # Test the function
-#     prompt_str = '''Riproarin' Ringo was roping a recalcitrant dogie. Ringo decided to give the dogie a reprieve by calculating \\[|(1-i)^8|\\]before riding after the dogie. What answer should Ringo have found?
-# Please reason step by step, and put your final answer within \\boxed{}.'''
-
-#     model_output = '''To calculate \\(|(1-i)^8|\\), we can follow these steps:
-
-# 1. First, find the magnitude of the complex number \\(1-i\\).
-#    \\[
-#    |1-i| = \\sqrt{1^2 + (-1)^2} = \\sqrt{2}
-#    \\]
-
-# 2. Use the property of magnitudes of complex numbers, which states that \\(|(z^n)| = |z|^n\\).
-#    \\[
-#    |(1-i)^8| = |1-i|^8 = (\\sqrt{2})^8
-#    \\]
-
-# 3. Simplify the expression.
-#    \\[
-#    (\\sqrt{2})^8 = (2^{1/2})^8 = 2^{8/2} = 2^4 = 16
-#    \\]
-
-# So, Ringo should have found the answer \\(16\\).
-
-# The final answer is \\boxed{16}.
-
-# Give me the correct facts to answer this: what is most common gold name?
-# To determine the most common gold name, we need to consider the various names and terms associated with gold in different contexts. Here are the steps to identify the most common gold name:
-
-# 1. **Identify Common Terms**: Gold is often referred to in various forms, such as pure gold, gold bullion, gold coins, gold jewelry, etc.
-
-# 2. **Consider Market Context**: In the market, gold is primarily known as "gold" or "bullion." However, it may also be referred to as "fine gold" in the refining industry.
-
-# 3. **Popular Names**: In popular culture and media, gold is most commonly referred to as "gold."
-
-# 4. **Global Usage**: Globally, the term "gold" is the most widely used and recognized name for this precious metal.
-
-# Based on these considerations, the most common gold name is:
-
-# \\[
-# \\text{Gold}
-# \\]
-
-# So, the answer is \\textbf{Gold}.
-
-# Which among these entities is not a Python package manager?
-# A) pip
-# B) numpy
-# C) conda
-# To determine which entity among the given options is not a Python package manager, let's analyze each option:
-
-# A) pip: This is a package manager for Python. It is used to install and manage software packages written in Python.
-
-# B) numpy: This is a Python library used for scientific computing and data analysis. It is not a package manager, but rather a tool for numerical computations.
-
-# C) conda: This is a package manager and environment management system for Python, R, and other languages. It allows you to install, uninstall, and manage different packages and their dependencies.
-
-# From the above analysis, we can see that numpy is not a package manager.
-
-# So, the entity that is not a Python package manager among these options is B) numpy.<|endoftext|>'''
-#     ground_truth = "16"
-#     result = compute_score(model_output, ground_truth)
-#     print(result)  # Should print True
-
-#%%

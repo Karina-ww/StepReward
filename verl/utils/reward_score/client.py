@@ -238,7 +238,7 @@ def interactive_mode(client: ChatClient, system_message: Optional[str] = None):
 def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description="vLLM ChatCompletion API Client")
-    parser.add_argument("--server", type=str, default="http://localhost:8000", help="服务器地址, server ip")
+    parser.add_argument("--server", type=str, default=None, help="服务器地址, server ip")
     parser.add_argument("--model", type=str, default="/user/yaoshu/models/Qwen_25_7B_Instruct", help="模型名称, model name")
     parser.add_argument("--system", type=str, default=None, help="系统提示, system prompt")
     parser.add_argument("--user", type=str, help="用户输入, user prompt")

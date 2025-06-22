@@ -401,80 +401,6 @@ def _timer(name: str, timing_raw: Dict[str, float]):
         yield
     timing_raw[name] = timer.last
 
-def normalize_first_token_prob(_batch, tkz, msg='Filtering'):
-    gt_mask = _batch.batch['ground_truth_mask_ce'] # 64, 3072
-    scores = _batch.batch['old_log_probs_ce'] # 64, 3072
-    # for key in _batch.batch.keys():
-    #     print(key, _batch.batch[key].shape, flush=True)
-    index = _batch.non_tensor_batch['uid']
-    
-    
-    # print(f'##GT_MASK: {gt_mask.shape}')
-    # print(f'##Scores: {scores.shape}') # 64, 3072, 3072
-        
-    # print(f'##@@ Batch ids: {_batch.batch["input_ids_ce"].shape} {type(_batch.batch["input_ids_ce"][gt_mask])} {len(_batch.batch["input_ids_ce"][gt_mask])}', flush=True)
-    # print(f'##@@ Batch ids: {_batch.batch["input_ids_ce"][0]} {_batch.batch["input_ids_ce"][gt_mask][0]}', flush=True)
-    # print(f'##@@ Batch ids: {_batch.batch["input_ids_ce"]}', flush=True)
-    # input_string = tkz.decode(_batch.batch['input_ids_ce'][0], skip_special_tokens=True)
-    # print(f'@@{msg}----{_batch.batch.keys()} {_batch.non_tensor_batch.keys()} Inputs[0]: {input_string}', flush=True)
-    
-    # _StringKeys(dict_keys(['responses', 'prompts', 'input_ids', 'attention_mask', 'position_ids', 'prompts_ce', 'responses_ce', 'input_ids_ce', 'attention_mask_ce', 'position_ids_ce', 'ground_truth_mask_ce', 'response_mask_ce', 'old_log_probs', 'old_log_probs_ce', 'ref_log_prob']))
-    # dict_keys(['data_source', 'ability', 'reward_model', 'extra_info', 'raw_prompt_ids', 'index', 'uid'])
-
-    # input_string = tkz.batch_decode(_batch.batch['input_ids_ce'], skip_special_tokens=False)
-    # gt_string = tkz.batch_decode(_batch.batch['input_ids_ce'][gt_mask], skip_special_tokens=False)
-    
-    # print(f'@@{msg}----{_batch.batch.keys()} {_batch.non_tensor_batch.keys()} Inputs: {input_string}\nScores: {scores}\nGTs:{gt_string}', flush=True)
-    id2score = defaultdict(list)
-    # id2mean = {}
-    id2max = {}
-
-    with torch.no_grad():
-        bsz = scores.shape[0]
-        # print(f'bsz={bsz}', flush=True)
-        
-        # Collect log prob scores, skip samples where GT not found (format-reward = 0)
-        for i in range(bsz):
-            if torch.any(gt_mask[i] == 1):
-                id2score[index[i]].append(scores[i][gt_mask[i] == 1])
-                # print(f'Collect score:{index[i]}: {id2score[index[i]][-1]}')
-
-        for idx in id2score:
-            # RuntimeError: stack expects each tensor to be equal size, but got [40] at entry 0 and [41] at entry 1
-            min_len = min([len(item) for item in id2score[idx]])
-            # id2score[idx] = torch.stack(id2score[idx]) # id => 8 x len(GT tokens)
-            id2score[idx] = torch.stack([item[:min_len] for item in id2score[idx]]) # id => 8 x len(GT tokens)
-            # print(f'Stack-{idx}: {id2score[idx]}')
-
-        for idx in id2score:
-            if len(id2score[idx]) >= 1:
-                # id2mean[idx] = torch.mean(id2score[idx], dim=0) # id => len(GT tokens)
-                id2max[idx] = torch.max(id2score[idx], dim=0).values # id => len(GT tokens)
-                # print(f'@@Get-{idx}-max: {torch.exp(id2score[idx])} => {torch.exp(id2max[idx])}')
-            else:
-                raise ValueError(f"no score in prompt index: {idx}")
-
-        for i in range(bsz):
-            # if format is incorrect, cannot parse the postion to insert GT
-            if torch.any(gt_mask[i] == 1):
-                max_logp = id2max[index[i]]
-                resp_gt_logp = scores[i][gt_mask[i] == 1]
-                prmp_gt_logp = id2score[index[i]]
-                
-                # print(f'\n\nMax_p-{index[i]}={torch.exp(max_logp[0])}, org_p={torch.exp(resp_gt_logp[0])}, all_p={torch.exp(prmp_gt_logp)}', flush=True)
-                # print(f'Score update: {torch.exp(resp_gt_logp[0])} => {torch.exp(resp_gt_logp[0] - max_logp[0])}', flush=True)
-
-                gt_token_ids = _batch.batch["responses_ce"][i][gt_mask[i] == 1]
-
-                # subtract on log-space
-                # print(f'Before GT scores: {torch.exp(resp_gt_logp)}, tokens: {tkz.convert_ids_to_tokens(gt_token_ids)}', flush=True)
-                resp_gt_logp[0] -= max_logp[0]
-                scores[i][gt_mask[i] == 1][0] = resp_gt_logp[0]
-                # print(f'After GT scores: {torch.exp(resp_gt_logp[0])}, tokens: {tkz.convert_ids_to_tokens(gt_token_ids)}', flush=True)
-
-    return _batch
-
-
 class TokenizerWrapper:
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
@@ -729,61 +655,44 @@ class RayPPOTrainer(object):
                                             collate_fn=collate_fn,
                                             sampler=sampler_repeat)
 
-        use_new = True
-        if use_new:
-            print(f"{self.config.data.val_files=} {type(self.config.data.val_files)=}")
-            if not isinstance(self.config.data.val_files, (List, ListConfig)):
-                parquet_files = [self.config.data.val_files]
-            else:
-                parquet_files = self.config.data.val_files
-
-            parquet_files = copy.deepcopy(parquet_files)
-            # self.config.data.val_files = self.config.data.val_files if isinstance(self.config.data.val_files, list) else [self.config.data.val_files]
-            self.val_datasets = []
-            self.val_dataloaders = []
-            self.val_names = []
-            for idx, val_file in enumerate(parquet_files):
-                print(f"Working on {val_file=}")
-                # Create dataset for current file
-                val_dataset = RLHFDataset(
-                    parquet_files=val_file,  
-                    tokenizer=self.tokenizer,
-                    prompt_key=self.config.data.prompt_key,
-                    max_prompt_length=self.config.data.get('val_max_prompt_length', 3072),
-                    filter_prompts=False,
-                    return_raw_chat=self.config.data.get('return_raw_chat', False),
-                    truncation='error'
-                )
-                
-                # Create dataloader for current dataset
-                val_dataloader = DataLoader(
-                    dataset=val_dataset,
-                    batch_size=len(val_dataset),  # Use full dataset size as batch size
-                    shuffle=False,
-                    drop_last=False,
-                    collate_fn=collate_fn
-                )
-                
-                self.val_datasets.append(val_dataset)
-                self.val_dataloaders.append(val_dataloader)
-                self.val_names.append(os.path.basename(val_file).replace('.', '_'))
-
+        print(f"{self.config.data.val_files=} {type(self.config.data.val_files)=}")
+        if not isinstance(self.config.data.val_files, (List, ListConfig)):
+            parquet_files = [self.config.data.val_files]
         else:
-            self.val_dataset = RLHFDataset(parquet_files=self.config.data.val_files,
-                                        tokenizer=self.tokenizer,
-                                        prompt_key=self.config.data.prompt_key,
-                                        max_prompt_length=self.config.data.get('val_max_prompt_length', 3072),
-                                        filter_prompts=False,
-                                        return_raw_chat=self.config.data.get('return_raw_chat', False),
-                                        truncation='error')
-            self.val_dataloader = DataLoader(
-                dataset=self.val_dataset,
-                # Validation datasets are sent to inference engines as a whole batch,
-                # which will schedule the memory themselves.
-                batch_size=len(self.val_dataset),
+            parquet_files = self.config.data.val_files
+
+        parquet_files = copy.deepcopy(parquet_files)
+        # self.config.data.val_files = self.config.data.val_files if isinstance(self.config.data.val_files, list) else [self.config.data.val_files]
+        self.val_datasets = []
+        self.val_dataloaders = []
+        self.val_names = []
+        for idx, val_file in enumerate(parquet_files):
+            print(f"Working on {val_file=}")
+            # Create dataset for current file
+            val_dataset = RLHFDataset(
+                parquet_files=val_file,  
+                tokenizer=self.tokenizer,
+                prompt_key=self.config.data.prompt_key,
+                max_prompt_length=self.config.data.get('val_max_prompt_length', 3072),
+                filter_prompts=False,
+                return_raw_chat=self.config.data.get('return_raw_chat', False),
+                truncation='error'
+            )
+            
+            # Create dataloader for current dataset
+            val_dataloader = DataLoader(
+                dataset=val_dataset,
+                batch_size=len(val_dataset),  # Use full dataset size as batch size
                 shuffle=False,
                 drop_last=False,
-                collate_fn=collate_fn)
+                collate_fn=collate_fn
+            )
+            
+            self.val_datasets.append(val_dataset)
+            self.val_dataloaders.append(val_dataloader)
+            self.val_names.append(os.path.basename(val_file).replace('.', '_'))
+
+
 
         assert len(self.train_dataloader) >= 1
         if use_new:
@@ -794,11 +703,8 @@ class RayPPOTrainer(object):
 
         print(f'Size of train dataloader: {len(self.train_dataloader)}')
         print(f'Total number of training samples: {len(self.train_dataloader.dataset)}')
-        if use_new:
-            for i, val_dataloader in enumerate(self.val_dataloaders):
-                print(f'Size of val dataloader {i+1}/{len(self.val_dataloaders)}: {len(val_dataloader)}')
-        else:
-            print(f'Size of val dataloader: {len(self.val_dataloader)}')
+        for i, val_dataloader in enumerate(self.val_dataloaders):
+            print(f'Size of val dataloader {i+1}/{len(self.val_dataloaders)}: {len(val_dataloader)}')
 
         # inject total_training_steps to actor/critic optim_config. This is hacky.
         total_training_steps = len(self.train_dataloader) * self.config.trainer.total_epochs
@@ -914,16 +820,6 @@ class RayPPOTrainer(object):
         sequences = [self.tokenizer.decode(batch[i_].batch['input_ids'][batch[i_].batch['attention_mask'].bool()], skip_special_tokens=False) for i_ in range(N)]
         ground_truths = [batch[i_].non_tensor_batch['reward_model']['ground_truth'] for i_ in range(N)]
 
-        # scoreAs = batch.batch[:N]['scoreAs']
-        # scoreBs = batch.batch[:N]['scoreBs']
-        # rewards = batch.batch[:N]['rewards']
-        # format_rewards = batch.batch[:N]['format_rewards']
-        # extracted_answers = batch.non_tensor_batch[:N]['extracted_answers']
-        # pr_scoreAs = batch.batch[:N]['pr_scoreAs']
-        # pr_scoreBs = batch.batch[:N]['pr_scoreBs']
-        # accs = batch.batch[:N]['accs']
-        # sequences = self.tokenizer.batch_decode(batch.batch[:N]['input_ids'][batch.batch['attention_mask'][:N].bool()], skip_special_tokens=False)
-        # ground_truths = batch[i_].non_tensor_batch['reward_model']['ground_truth']
 
         if 'mix' in self.config.reward_model.reward_manager:
             samples = list(zip(
@@ -1004,10 +900,6 @@ class RayPPOTrainer(object):
             columns = ["step"] + sum([[f"{i+1}_data_source", f"{i+1}_sequence", f"{i+1}_extracted_answer", f"{i+1}_ground_truth", f"{i+1}_advantage", f"{i+1}_score", f"{i+1}_scoreA", f"{i+1}_scoreB", f"{i+1}_format_reward", f"{i+1}_final_reward_std", f"{i+1}_entropy"] for i in range(len(samples))], [])
         samples.sort(key=lambda x: x[0])  # Sort by input text
 
-        # Create column names for all samples
-        # columns = ["step"] + sum([[f"data_source_{i+1}", f"sequence_{i+1}", f"extracted_answer_{i+1}", f"ground_truth_{i+1}", f"advantage_{i+1}", f"score_{i+1}", f"scoreB_{i+1}", f"format_reward_{i+1}", f"entropy_{i+1}"] for i in range(len(samples))], [])
-        # columns = ["step"] + sum([f"{i+1}_data_source", f"{i+1}_sequence", f"{i+1}_extracted_answer", f"{i+1}_ground_truth", f"{i+1}_advantage", f"{i+1}_score", f"{i+1}_scoreA", f"{i+1}_scoreB", f"{i+1}_format_reward", f"{i+1}_final_reward_std", f"{i+1}_entropy, f"{i+1}_vr_score", f"{i+1}_"] for i in range(len(samples))], [])
-
 
         if not hasattr(self, table_attr_name):
             # Initialize the table on first call
@@ -1086,8 +978,6 @@ class RayPPOTrainer(object):
                 ['Math-500', 'gpqa_diamond', 'mmlu_pro-test-1000'], # for the old version
                 
                 ['AIME2024-avg16', 'AIME2025-avg16', 'AMC2023-avg16', 'Math-500-avg2', 'gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2', 'WebInstruct-verified-val-avg2'],
-                # ['Math-500-avg2', 'gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2', 'WebInstruct-verified-val-avg2'],
-                # ['Math-500-avg2', 'gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2'],
                 ['AIME2024-avg16', 'AIME2025-avg16', 'AMC2023-avg16', 'Math-500-avg2'],
                 ['gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2', 'WebInstruct-verified-val-avg2'],
                 
@@ -1879,14 +1769,6 @@ class RayPPOTrainer(object):
                                         old_log_prob_ce = self.actor_rollout_wg.compute_log_prob_ce(batch)
                                         batch = batch.union(old_log_prob_ce) # batch.batch['old_log_probs_ce']           'attention_mask_ce', 'ground_truth_mask_ce'
                                         
-                                        ## FIXME: normalized
-                                        # print('================================================================')
-                                        # print(self.config.reward_model)
-                                        # print(self.config.reward_model.get("normalize_first_token_prob", False))
-                                        # print('================================================================')
-                                        if self.config.reward_model.get("normalize_first_token_prob", False):
-                                            normalize_first_token_prob(batch, self.tokenizer, msg='Filtering')
-
                                 if 'mix' in self.config.reward_model.reward_manager:
                                     reward_tensor, scoreB_tensor, scoreA_tensor, format_reward_tensor, extracted_answer_list, straightA_tensor, exact_tensor, pr_scoreB_tensor, pr_scoreA_tensor, pr_reward_tensor, vr_reward_tensor = self.reward_fn(batch) # reward_tensor.shape: torch.Size([40, 1024])
                                     batch.batch['token_level_pr'] = pr_reward_tensor
@@ -2100,12 +1982,6 @@ class RayPPOTrainer(object):
                             batch = batch.union(reward_tensor)
 
 
-                        ## FIXME: normalized
-                        # print('================================================================')
-                        # print(self.config.reward_model.get("normalize_first_token_prob", False))
-                        # print('================================================================')
-                        if self.config.reward_model.get("normalize_first_token_prob", False):
-                            normalize_first_token_prob(batch, self.tokenizer, msg='Updating')
                         if 'mix' in self.config.reward_model.reward_manager:
                             reward_tensor, scoreB_tensor, scoreA_tensor, format_reward_tensor, extracted_answer_list, straightA_tensor, exact_tensor, pr_scoreB_tensor, pr_scoreA_tensor, pr_reward_tensor, vr_reward_tensor = self.reward_fn(batch) # reward_tensor.shape: torch.Size([40, 1024])
                             batch.batch['token_level_pr'] = pr_reward_tensor
