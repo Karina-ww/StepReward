@@ -71,13 +71,6 @@ cd RLPR
 bash scripts/setup_env.sh
 ```
 
-<!-- ## Model Weights 
-
-| Model   | Description |           Download           |
-| ------- | ----------- | :--------------------------: |
-| RLPR 7B |      placeholder       | [🤗](https://huggingface.co) | -->
-
-
 ## Train
 
 1. Prepare data
