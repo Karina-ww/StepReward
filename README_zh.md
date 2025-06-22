@@ -8,9 +8,7 @@
 
 <a href='https://arxiv.org'><img src='https://img.shields.io/badge/Paper-PDF-purple'></a>
 <a href='https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset'><img src='https://img.shields.io/badge/Dataset-Train-Green'></a>
-<a href='https://huggingface.co/openbmb/RLPR-Qwen2.5-7B-Base'><img src='https://img.shields.io/badge/Model-Qwen2.5_7B-orange'></a>
-<a href='https://huggingface.co/openbmb/RLPR-Gemma2-2B-it'><img src='https://img.shields.io/badge/Model-Gemma2_2B-orange'></a>
-<a href='https://huggingface.co/openbmb/RLPR-Llama3.1-8B-Inst'><img src='https://img.shields.io/badge/Model-Llama31_8B-orange'></a>
+<a href='https://huggingface.co/collections/openbmb/rlpr-6857fa5d22cbe64327a3f8f6'><img src='https://img.shields.io/badge/Model-Qwen_Llama_Gemma-orange'></a>
 
 <h4 align="center">
     <p>
