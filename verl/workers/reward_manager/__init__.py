@@ -14,6 +14,5 @@
 
 from .naive import NaiveRewardManager
 from .prime import PrimeRewardManager
-from .ce import CERewardManager
-from .ce_math import CEMathRewardManager
+from .prob import ProbRewardManager
 from .mix import MixRewardManager

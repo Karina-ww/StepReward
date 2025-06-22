@@ -23,7 +23,7 @@ class MixRewardManager(object):
             num_examine=num_examine,
             compute_score=compute_exact_score_func,
         )
-        self.pr_manager = CERewardManager(
+        self.pr_manager = ProbRewardManager(
             tokenizer=tokenizer,
             num_examine=num_examine,
             compute_score_name=compute_fuzzy_score_name,

@@ -89,7 +89,7 @@
 3.  (可选) 如果您想使用 wandb 进行日志记录，请登录 wandb 并在 `examples/RLPR/reproduce.sh` 中将 `USE_WANDB` 设置为 `True`。
 
     ```bash
-    : "${USE_WANDB:=true}"
+    USE_WANDB=${USE_WANDB:-"false"}
     ```
 
 4.  (可选) 如果您想使用大语言模型作为评估 (llm as a judge) 的评估方法，请按照以下步骤操作。如果您想使用基于规则的验证器来判断答案，您可以跳过此步骤。

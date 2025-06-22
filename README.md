@@ -82,17 +82,21 @@ bash setup_env.sh
 
 1. Prepare data
 
-Download the [train](https://huggingface.co/) and [test](https://huggingface.co/) dataset. Move `rlpr_train.parquet` to `./datasets/train`, and move all the test datasets to `./datasets/test`.
+Download the [train](https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset) and [test](https://huggingface.co/datasets/openbmb/RLPR-Evaluation) dataset. Move `rlpr_train.parquet` to `./datasets/train`, and move all the test datasets to `./datasets/test`.
+```bash
+huggingface-cli download --repo-type dataset --resume-download openbmb/RLPR-Train-Dataset --local-dir ./datasets/train
+huggingface-cli download --repo-type dataset --resume-download openbmb/RLPR-Evaluation --local-dir ./datasets/test
+```
 
-1. Specify the base model path `examples/RLPR/reproduce.sh`.
+2. Specify the base model path `examples/RLPR/reproduce.sh`.
 ```bash
 MODEL=path_to_base_model
 ```
 
-1. (Optional) Login wandb and set USE_WANDB to True in the `examples/RLPR/reproduce.sh` if you want to use wandb for logging.
+3. (Optional) Login wandb and set USE_WANDB to True in the `examples/RLPR/reproduce.sh` if you want to use wandb for logging.
 
 ```bash
-: "${USE_WANDB:=true}"
+USE_WANDB=${USE_WANDB:-"false"}
 ```
 
 4. (Optional) Follow the following steps to use the `llm as a judge` eval method. Skip this step if you want to use a rule-based verifier to judge the answer.

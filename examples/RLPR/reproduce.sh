@@ -2,7 +2,6 @@ set -x
 
 # --- Control WandB Usage ---
 # Set USE_WANDB to "false" to disable WandB logging.
-# : "${USE_WANDB:=false}"
 USE_WANDB=${USE_WANDB:-"false"}
 
 # Basic Project Settings
@@ -134,7 +133,7 @@ python -m verl.trainer.main_ppo \
     trainer.total_epochs=100 \
     +trainer.val_save_results_dir=${VAL_SAVE_RESULTS_DIR} \
     trainer.default_local_dir=${LOCAL_DIR} \
-    reward_model.reward_manager=ce_prob \
+    reward_model.reward_manager=prob \
     +reward_model.reward_manager_shaping_function_name=threshold_0 \
     +reward_model.compute_score_name=mean_exp_log_softmax \
     +reward_model.version=v2.1 \

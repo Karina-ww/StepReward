@@ -111,15 +111,6 @@ def main_task(config, compute_score=None):
         from verl.workers.reward_manager import PrimeRewardManager
         reward_manager_cls = PrimeRewardManager
         reward_fn = reward_manager_cls(tokenizer=tokenizer, num_examine=0, compute_score=compute_score)
-    elif 'ce_math' in reward_manager_name: # cross entropy
-        raise NotImplementedError
-        from verl.workers.reward_manager import CEMathRewardManager
-        reward_manager_cls = CEMathRewardManager
-        reward_fn = reward_manager_cls(tokenizer=tokenizer, num_examine=0, compute_score=compute_score,
-                                       compute_score_name=config.reward_model.get('compute_score_name', None), 
-                                       shaping_function_name=config.reward_model.get('reward_manager_shaping_function_name', 'identity'),
-                                       format_coefficient=config.reward_model.get('format_coefficient', 0.1))
- 
     elif 'mix' in reward_manager_name:
         from verl.workers.reward_manager import MixRewardManager
         reward_manager_cls = MixRewardManager
@@ -135,9 +126,9 @@ def main_task(config, compute_score=None):
             pr_weight=config.reward_model.get('pr_weight', 0.5),
             vr_weight=config.reward_model.get('vr_weight', 1.0),
         )
-    elif 'ce' in reward_manager_name: # cross entropy
-        from verl.workers.reward_manager import CERewardManager
-        reward_manager_cls = CERewardManager
+    elif 'prob' in reward_manager_name: # cross entropy
+        from verl.workers.reward_manager import ProbRewardManager
+        reward_manager_cls = ProbRewardManager
         reward_fn = reward_manager_cls(tokenizer=tokenizer, num_examine=0, 
                                        compute_score_name=config.reward_model.get('compute_score_name', None), 
                                        shaping_function_name=config.reward_model.get('reward_manager_shaping_function_name', 'identity'),
@@ -154,7 +145,6 @@ def main_task(config, compute_score=None):
 
     # Note that we always use function-based RM for validation
     val_reward_manager_name = config.reward_model.get("val_reward_manager", reward_manager_name)
-    # val_reward_fn = reward_manager_cls(tokenizer=tokenizer, num_examine=1, compute_score=compute_score)
     if val_reward_manager_name == 'naive':
         from verl.workers.reward_manager import NaiveRewardManager
         val_reward_manager_cls = NaiveRewardManager
@@ -166,13 +156,6 @@ def main_task(config, compute_score=None):
         val_reward_manager_cls = PrimeRewardManager
         val_reward_fn = val_reward_manager_cls(tokenizer=tokenizer, num_examine=1, compute_score=compute_score, 
                                                save_results_dir=config.trainer.get('val_save_results_dir', None))
-    # elif val_reward_manager_name == 'ce': # cross entropy
-    #     from verl.workers.reward_manager import CERewardManager
-    #     val_reward_manager_cls = CERewardManager
-    #     val_reward_fn = val_reward_manager_cls(tokenizer=tokenizer, num_examine=1, 
-    #                                            compute_score_name=config.reward_model.get('compute_score_name', None), 
-    #                                            shaping_function_name=config.reward_model.get('reward_manager_shaping_function_name', 'identity'))
-        # assert False, "We do not use CE reward in validation"
     else:
         print(f"{reward_manager_name=}")
         raise NotImplementedError

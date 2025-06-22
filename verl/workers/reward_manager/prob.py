@@ -143,7 +143,7 @@ def format_reward(predict_str: str, prompt_str: str) -> float:
     return 1.0 if match_result else 0.0
 
 
-class CERewardManager:
+class ProbRewardManager:
     """The reward manager.
     """
 
@@ -204,18 +204,9 @@ class CERewardManager:
         self.gt_tokens_one_more = gt_tokens_one_more
         self.gt_tokens_one_more_adjusted = gt_tokens_one_more_adjusted
 
-    def __call__(self, data: DataProto, suffix='_ce'):
+    def __call__(self, data: DataProto, suffix='_prob'):
         """We will expand this function gradually based on the available datasets"""
 
-        # import debugpy
-        # try:
-            # debugpy.listen(("localhost", 3000))
-            # print("Waiting for debugger attach")
-            # debugpy.wait_for_client()
-        # except Exception as e:
-            # pass
-
-        # If there is rm score, we directly return rm score. Otherwise, we compute via rm_score_fn
         if 'rm_scores' in data.batch.keys():
             return data.batch['rm_scores']
 
@@ -339,7 +330,7 @@ class CERewardManager:
             scoreA = 0
             extracted_answer = res[1]
         else:
-            scoreB = self.compute_scoreB(data_item.batch['old_log_probs_ce'], data_item.batch['ground_truth_mask_ce']) # shape: [1024]
+            scoreB = self.compute_scoreB(data_item.batch['old_log_probs_prob'], data_item.batch['ground_truth_mask_prob']) # shape: [1024]
             scoreA = data_item.non_tensor_batch['reward_model'].get('scoreA', 0.0)
 
             predict_str = self.tokenizer.decode(valid_response_ids) # To determine the relationship ... relative to each other and the parabola.<|im_end|>

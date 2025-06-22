@@ -695,11 +695,8 @@ class RayPPOTrainer(object):
 
 
         assert len(self.train_dataloader) >= 1
-        if use_new:
-            for i in range(len(self.val_dataloaders)):
-                assert len(self.val_dataloaders[i]) >= 1
-        else:
-            assert len(self.val_dataloader) >= 1
+        for i in range(len(self.val_dataloaders)):
+            assert len(self.val_dataloaders[i]) >= 1
 
         print(f'Size of train dataloader: {len(self.train_dataloader)}')
         print(f'Total number of training samples: {len(self.train_dataloader.dataset)}')
@@ -847,12 +844,9 @@ class RayPPOTrainer(object):
             columns += [f'{j}_{k}_format_reward']
             columns += [f'{j}_{k}_sequence']
 
-        # if not hasattr(self, 'train_table'):
         if not hasattr(self, table_attr_name):
             # Initialize the table on first call
-            # getattr(self, table_attr_name) = 
             setattr(self, table_attr_name, wandb.Table(columns=columns))
-            # self.train_table = wandb.Table(columns=columns)
 
         # Create a new table with same columns and existing data
         # Workaround for https://github.com/wandb/wandb/issues/2981#issuecomment-1997445737
@@ -1031,14 +1025,11 @@ class RayPPOTrainer(object):
                 else:
                     n = 1
                 print(f'\n## validating {val_name} ##\n')
-                # for test_data in self.val_dataloader:
                 for test_data in val_dataloader:
                     test_batch = DataProto.from_single_dict(test_data)
                     debug = False
                     if debug:
                         print(f"{idx=} In validation: {test_batch=}", flush=True) # bs=1021
-                        # test_batch = test_batch.slice(list(range(7444)))
-                        # print(f"{idx=} After slicing In validation: {test_batch=}", flush=True) # bs=1021
                         print(f"{idx=} {self.actor_rollout_wg.world_size=}")
 
                     # we only do validation on rule-based rm
@@ -1080,7 +1071,6 @@ class RayPPOTrainer(object):
                     print(f"In validation: {test_gen_batch.meta_info=}", flush=True)
 
                     # pad to be divisible by dp_size
-                    # print(f"{len(test_gen_batch)=}")
                     test_gen_batch_padded, pad_size = pad_dataproto_to_divisor(test_gen_batch, self.actor_rollout_wg.world_size)
 
                     debug = False
@@ -1089,13 +1079,9 @@ class RayPPOTrainer(object):
                         print(f"{pad_size=}")
                         print(f"{self.actor_rollout_wg.world_size=}")
                     
-                    # print(f"{len(test_gen_batch_padded)=}")
                     test_output_gen_batch_padded = self.actor_rollout_wg.generate_sequences(test_gen_batch_padded)
-                    # print(f"{len(test_output_gen_batch_padded)=}")
                     test_output_gen_batch = unpad_dataproto(test_output_gen_batch_padded, pad_size=pad_size * n)
 
-
-                    # test_output_gen_batch.batch['prompts']: contains multiple prompts. Each ids correspond to "'system\\n\\n... We bought three types of gift items for 720 Ft, a total of 20 pieces, with unit prices of 60 Ft, 50 Ft, and 10 Ft. How many pieces of each type did we buy?\\n\\nPresent the answer in LaTex format: \\\\boxed{Your answer}\\nassistant\\n'"
 
                     # Store generated outputs
                     output_ids = test_output_gen_batch.batch['responses']
@@ -1106,8 +1092,6 @@ class RayPPOTrainer(object):
                     test_batch = test_batch.union(test_output_gen_batch)
 
                     # evaluate using reward_function
-                    # reward_tensor, acc_tensor, format_reward_tensor = self.val_reward_fn(test_batch)
-                    # _, acc_tensor, __ = self.val_reward_fn(test_batch)
                     reward_tensor, acc_tensor, scoreA_tensor, format_reward_tensor, extracted_answer_list = self.val_reward_fn(test_batch, name=f"{self.config.trainer.experiment_name}-{val_name}-{decoding_strategy}-global_step_{self.global_steps}")
 
                     # Store scores
@@ -1117,15 +1101,12 @@ class RayPPOTrainer(object):
                     sample_scores.extend(scores)
                     sample_accs.extend(accs)
                     sample_format_rewards.extend(format_rewards)
-                    # print(f"{extracted_answer_list=} {scores=}")
                     sample_extracted_answers.extend(extracted_answer_list)
                     for i_ in range(len(test_batch)):
                         sample_ground_truths.append(test_batch[i_].non_tensor_batch['reward_model']['ground_truth'])
                         sample_data_sources.append(test_batch[i_].non_tensor_batch['data_source'])
 
-                    # reward_tensor_lst.append(reward_tensor)
                     acc_tensor_lst.append(acc_tensor)
-                    # data_source_lst.append(test_batch.non_tensor_batch.get('data_source', ['unknown'] * reward_tensor.shape[0]))
                     data_source_lst.append(test_batch.non_tensor_batch.get('data_source', ['unknown'] * acc_tensor.shape[0]))
                     for i in range(len(test_batch)):
                         data_source2count[test_batch[i].non_tensor_batch.get('data_source', 'unknown')] += 1
@@ -1142,7 +1123,6 @@ class RayPPOTrainer(object):
                                                  table_name=f"val_generations_{decoding_strategy}")
 
  
-        # reward_tensor = torch.cat(reward_tensor_lst, dim=0).sum(-1).cpu()  # (batch_size,)
         acc_tensor = torch.cat(acc_tensor_lst, dim=0).sum(-1).cpu()  # (batch_size,)
         data_sources = np.concatenate(data_source_lst, axis=0)
 
@@ -1162,20 +1142,12 @@ class RayPPOTrainer(object):
         # Compute overall mean score across all data sources
         suffixes = ['R1', 'OC', 'SysR1', 'UserR1']  # Add or remove suffixes as needed
         
-        # data_source_set = list(sorted(set(['-'.join(data_source.split('-')[:-1]) for data_source in data_source_set if any(data_source.endswith(f'-{suffix}') for suffix in suffixes)]))) # set(['-'.join(data_source.split('-')[:-1]) for data_source in data_source_set])
-        # print(f"{data_source_set=}")
-        # data_source_not_counted = ['numina_synthetic_math', 'numina_olympiads', 'numina_cn_k12', 'numina_synthetic_amc', 'numina_aops_forum', 'numina_amc_aime']
-        # for ds in data_source_not_counted:
-        #     if ds in data_source_set:
-        #         data_source_set.remove(ds)
 
         for data_source_set in [
             ['AIME2024', 'AIME2025', 'AMC2023', 'Math-500', 'gpqa_diamond', 'mmlu_pro-test-1000', 'WebInstruct-verified-val'],
             ['Math-500', 'gpqa_diamond', 'mmlu_pro-test-1000'],
 
             ['AIME2024-avg16', 'AIME2025-avg16', 'AMC2023-avg16', 'Math-500-avg2', 'gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2', 'WebInstruct-verified-val-avg2'],
-            # ['Math-500-avg2', 'gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2', 'WebInstruct-verified-val-avg2'],
-            # ['Math-500-avg2', 'gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2'],
             ['AIME2024-avg16', 'AIME2025-avg16', 'AMC2023-avg16', 'Math-500-avg2'],
             ['gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2', 'WebInstruct-verified-val-avg2'],
 
@@ -1193,7 +1165,6 @@ class RayPPOTrainer(object):
                     if all(f'val_{decoding_strategy}/test_acc/{val_set}-{suffix}' in metric_dict for suffix in suffixes_log):
                         acc_list.append(max(metric_dict[f'val_{decoding_strategy}/test_acc/{val_set}-{suffix}'] for suffix in suffixes_log))
                     if len(acc_list) > 0:
-                        # metric_dict[f'val_mean_{decoding_strategy}/test_acc/best-mean_{"+".join([source.split("-")[0] for source in data_source_set])}'] = np.mean(acc_list)
                         metric_dict[f'val_mean_{decoding_strategy}/test_acc/best-mean_{"+".join([source for source in data_source_set])}'] = np.mean(acc_list)
 
         return metric_dict #, data_source_set
@@ -1202,10 +1173,8 @@ class RayPPOTrainer(object):
         specific_mean = self.compute_specific_means(metric_dict, [f'{source}-{suffix}' for source in data_source_set], decoding_strategy=decoding_strategy)
         if specific_mean is not None:
             if decoding_strategy:
-                # metric_dict[f'val_mean_{decoding_strategy}/test_acc/{suffix}-mean_{"+".join([source.split("-")[0] for source in data_source_set])}'] = specific_mean
                 metric_dict[f'val_mean_{decoding_strategy}/test_acc/{suffix}-mean_{"+".join([source for source in data_source_set])}'] = specific_mean
             else:
-                # metric_dict[f'val_mean/test_acc/{suffix}-mean_{"+".join([source.split("-")[0] for source in data_source_set])}'] = specific_mean
                 metric_dict[f'val_mean/test_acc/{suffix}-mean_{"+".join([source for source in data_source_set])}'] = specific_mean
 
     @staticmethod
@@ -1549,21 +1518,13 @@ class RayPPOTrainer(object):
             if self.config.trainer.get('val_only', False):
                 return
 
-        # import debugpy
-        # try:
-            # debugpy.listen(("localhost", 3000))
-            # print("Waiting for debugger attach")
-            # debugpy.wait_for_client()
-        # except Exception as e:
-            # pass
-
         batch_size = self.config.data.train_batch_size
         n_samples = self.config.actor_rollout_ref.rollout.n
 
         if self.config.data.get('filter_accuracy', False) or self.config.data.get('filter_truncated', False):
             config_data_filter_accuracy, config_data_filter_truncated = self.config.data.filter_accuracy, self.config.data.filter_truncated
 
-            if self.config.data.get('filter_mode', 'default') in ['aggregation', 'sliding_window', 'EMA']:
+            if self.config.data.get('filter_mode', 'default') in ['EMA']:
                 score_std_list = []
 
         else:
@@ -1586,7 +1547,7 @@ class RayPPOTrainer(object):
                 timing_raw = {}
 
                 if config_data_filter_accuracy or config_data_filter_truncated:
-                    if self.config.data.get('filter_mode', 'default') in ['aggregation', 'sliding_window', 'EMA']:
+                    if self.config.data.get('filter_mode', 'default') in ['EMA']:
                         if self.global_steps >= self.config.data.get('filter_start_step', 0):
                             self.config.data.filter_accuracy, self.config.data.filter_truncated = config_data_filter_accuracy, config_data_filter_truncated
                         else:
@@ -1594,23 +1555,7 @@ class RayPPOTrainer(object):
                             assert self.config.data.accuracy_lower_bound == 0
 
 
-                    if self.config.data.get('filter_mode', 'default') == 'aggregation':
-                        if self.global_steps < self.config.data.get('filter_start_step', 0):
-                            print(f"We are aggregating the std list before deciding the lower bound for the filtering until {self.config.data.get('filter_start_step', 0) - 1}")
-                        elif self.global_steps == self.config.data.get('filter_start_step', 0):
-                            # set up the new filter accuracy lower bound
-                            self.config.data.accuracy_lower_bound = sum(score_std_list) / len(score_std_list) * self.config.data.accuracy_lower_bound_ratio
-                            del score_std_list
-                    elif self.config.data.get('filter_mode', 'default') == 'sliding_window':
-                        if self.global_steps >= self.config.data.filter_start_step - self.config.data.filter_window_size:
-                            if len(score_std_list) == self.config.data.filter_window_size:
-                                print(f"We are calculating the score_std_list: {self.global_steps=} {len(score_std_list)=} {len(score_std_list[-1])=}")
-                                flattened_list = [item for sublist in score_std_list for item in sublist]
-                                overall_mean = sum(flattened_list) / len(flattened_list)
-                                self.config.data.accuracy_lower_bound = overall_mean * self.config.data.accuracy_lower_bound_ratio
-                                score_std_list.pop(0)
-                            score_std_list.append([])
-                    elif self.config.data.get('filter_mode', 'default') == 'EMA':
+                    if self.config.data.get('filter_mode', 'default') == 'EMA':
                         if self.global_steps == 1 or (self.config.data.get('resume_ema_mean', None) is not None):
                             ema_mean = self.config.data.get('resume_ema_mean', None)
                             if ema_mean is not None:
@@ -1639,7 +1584,6 @@ class RayPPOTrainer(object):
                                 print(f"{ema_mean=} for {self.global_steps=}")
                                 print(f"For debugging: {self.calculate_ema(score_std_list, self.config.data.filter_ema_ratio)=}")
                                 
-                                # ema_mean = self.calculate_ema(score_std_list, self.config.data.filter_ema_ratio)
                                 self.config.data.accuracy_lower_bound = ema_mean * self.config.data.accuracy_lower_bound_ratio
                             score_std_list.append([])
 
@@ -1732,42 +1676,28 @@ class RayPPOTrainer(object):
 
                         if self.config.algorithm.adv_estimator == 'remax':
                             raise NotImplementedError
-                            with _timer('gen_max', timing_raw):
-                                gen_baseline_batch = deepcopy(gen_batch)
-                                gen_baseline_batch.meta_info['do_sample'] = False
-                                gen_baseline_output = self.actor_rollout_wg.generate_sequences(gen_baseline_batch)
 
-                                batch = batch.union(gen_baseline_output)
-                                reward_baseline_tensor = self.reward_fn(batch)
-                                reward_baseline_tensor = reward_baseline_tensor.sum(dim=-1)
-
-                                batch.pop(batch_keys=list(gen_baseline_output.batch.keys()))
-
-                                batch.batch['reward_baselines'] = reward_baseline_tensor
-
-                                del gen_baseline_batch, gen_baseline_output
-
-                        if 'ce' in self.config.reward_model.reward_manager:
+                        if 'prob' in self.config.reward_model.reward_manager:
                             print(f"Using cross entropy reward...")
                             ground_truth_list = [batch[i_].non_tensor_batch['reward_model']['ground_truth'] for i_ in range(len(batch))]
                             ground_truth_list = [item for item in ground_truth_list for _ in range(self.config.actor_rollout_ref.rollout.n)]
-                            gen_batch_output_ce = self.construct_new_batch_optimized(gen_batch_output, ground_truth_list)
+                            gen_batch_output_prob = self.construct_new_batch_optimized(gen_batch_output, ground_truth_list)
 
                         # repeat to align with repeated responses in rollout
                         batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
                         batch = batch.union(gen_batch_output)
 
 
-                        if 'ce' in self.config.reward_model.reward_manager:
-                            batch = batch.union(gen_batch_output_ce)
+                        if 'prob' in self.config.reward_model.reward_manager:
+                            batch = batch.union(gen_batch_output_prob)
 
                         # do accuracy filtering and score logging
                         if self.config.data.get('filter_accuracy', False) or self.config.data.get('filter_truncated', False):
                             with _timer('verify', timing_raw):
-                                if 'ce' in self.config.reward_model.reward_manager:
-                                    with _timer('old_log_prob_ce', timing_raw):
-                                        old_log_prob_ce = self.actor_rollout_wg.compute_log_prob_ce(batch)
-                                        batch = batch.union(old_log_prob_ce) # batch.batch['old_log_probs_ce']           'attention_mask_ce', 'ground_truth_mask_ce'
+                                if 'prob' in self.config.reward_model.reward_manager:
+                                    with _timer('old_log_prob_prob', timing_raw):
+                                        old_log_prob_prob = self.actor_rollout_wg.compute_log_prob_prob(batch)
+                                        batch = batch.union(old_log_prob_prob) 
                                         
                                 if 'mix' in self.config.reward_model.reward_manager:
                                     reward_tensor, scoreB_tensor, scoreA_tensor, format_reward_tensor, extracted_answer_list, straightA_tensor, exact_tensor, pr_scoreB_tensor, pr_scoreA_tensor, pr_reward_tensor, vr_reward_tensor = self.reward_fn(batch) # reward_tensor.shape: torch.Size([40, 1024])
@@ -1797,7 +1727,6 @@ class RayPPOTrainer(object):
                                         for i_, response_i in enumerate(responses):
                                             # Apply repetition penalty
                                             non_zero_indices = reward_tensor[i_].nonzero(as_tuple=True)
-                                            # reward_tensor[i_][non_zero_indices] += detect_repetition_with_hash(response_i, window_size=10)
                                             repetition_penalty = detect_repetition_with_hash(response_i, window_size=10, max_repetitions_limit=self.config.reward_model.get("repetition_penalty_max_repetitions_limit", 10))
                                             reward_tensor[i_][non_zero_indices] += repetition_penalty
 
@@ -1839,11 +1768,7 @@ class RayPPOTrainer(object):
                                         # filter_target = [filter_target[i_] * dict_accuracy_lower_bound_ratio_per_data_source[batch[i_].non_tensor_batch['data_source']]  for i_ in range(len(filter_target))]
 
 
-                                    if self.config.data.get('filter_mode', 'default') == 'sliding_window':
-                                        if self.global_steps >= self.config.data.filter_start_step - self.config.data.filter_window_size:
-                                            score_std_list[-1].extend([batch[i_].batch['final_reward_stds'].item() for i_ in range(len(batch)) if (not math.isnan(batch[i_].batch['final_reward_stds'].item()) and not  math.isinf(batch[i_].batch['final_reward_stds'].item()))])
-                                        print(f"{self.global_steps=} {len(score_std_list)=} {len(score_std_list[-1])}")
-                                    elif self.config.data.get('filter_mode', 'default') == 'EMA':
+                                    if self.config.data.get('filter_mode', 'default') == 'EMA':
                                         if self.global_steps >= self.config.data.filter_start_step:
                                             score_std_list[-1].extend([batch[i_].batch['final_reward_stds'].item() for i_ in range(len(batch)) if (not math.isnan(batch[i_].batch['final_reward_stds'].item()) and not  math.isinf(batch[i_].batch['final_reward_stds'].item()))])
                                         print(f"{self.global_steps=} {len(score_std_list)=} {len(score_std_list[-1])}")
@@ -1852,10 +1777,6 @@ class RayPPOTrainer(object):
                                         batch.pop(batch_keys=['token_level_scores', 'token_level_rewards', 'token_level_vr', 'token_level_pr', 'advantages', 'returns', 'final_reward_stds'])
                                     else:
                                         batch.pop(batch_keys=['token_level_scores', 'token_level_rewards', 'advantages', 'returns', 'final_reward_stds'])
-                                elif self.config.data.filter_target == 'straightA':
-                                    raise NotImplementedError
-                                    print(f"We use straightA for filtering")
-                                    filter_target = [straightA_tensor[i_][0].float() for i_ in range(len(batch))]
                                 elif self.config.data.filter_target == 'scoreB':
                                     print(f"We use scoreB for filtering")
                                     filter_target = [scoreB_tensor[i_].sum(-1).item() for i_ in range(len(batch))]
@@ -1877,7 +1798,6 @@ class RayPPOTrainer(object):
                                 })
                                 current_batch_idx += 1
                                 # filter by accuracy
-                                # batch, final_mask, metrics_filter = self.filter(scoreB_minus_scoreA_list, batch, n_samples)
                                 batch, final_mask, metrics_filter, origin_batch = self.filter(filter_target, batch, n_samples)
                                 metrics.update(metrics_filter)
 
@@ -1913,8 +1833,8 @@ class RayPPOTrainer(object):
                         batch = buffer_batch.slice(range(0, count))
                         buffer_batch = buffer_batch.slice(range(count, len(buffer_batch)))
                         if self.config.data.get("filter_cache_regenerate", False):
-                            if 'ce' in self.config.reward_model.reward_manager:
-                                buffer_batch.pop([batch_k for batch_k in buffer_batch.batch.keys() if batch_k.endswith('_ce')])
+                            if 'prob' in self.config.reward_model.reward_manager:
+                                buffer_batch.pop([batch_k for batch_k in buffer_batch.batch.keys() if batch_k.endswith('_prob')])
                             cache_data = self.add_to_cache(cache_data, buffer_batch, n_samples, tmp_dict)
                             buffer_batch = []
                     else:
@@ -1948,11 +1868,11 @@ class RayPPOTrainer(object):
                             'entropy/response_entropy/min': torch.min(row_mean).item(),
                         })
 
-                    if 'ce' in self.config.reward_model.reward_manager and self.config.data.get("filter_accuracy", False) is False:
+                    if 'prob' in self.config.reward_model.reward_manager and self.config.data.get("filter_accuracy", False) is False:
                         # If we use accuracy filter, then skip below
-                        with _timer('old_log_prob_ce', timing_raw):
-                            old_log_prob_ce = self.actor_rollout_wg.compute_log_prob_ce(batch)
-                            batch = batch.union(old_log_prob_ce)
+                        with _timer('old_log_prob_prob', timing_raw):
+                            old_log_prob_prob = self.actor_rollout_wg.compute_log_prob_prob(batch)
+                            batch = batch.union(old_log_prob_prob)
 
                     if self.use_reference_policy:
                         # compute reference log_prob
@@ -2010,7 +1930,6 @@ class RayPPOTrainer(object):
                             for i_, response_i in enumerate(responses):
                                 # Apply repetition penalty
                                 non_zero_indices = reward_tensor[i_].nonzero(as_tuple=True)
-                                # reward_tensor[i_][non_zero_indices] += detect_repetition_with_hash(response_i, window_size=10)
                                 repetition_penalty = detect_repetition_with_hash(response_i, window_size=10, max_repetitions_limit=self.config.reward_model.get("repetition_penalty_max_repetitions_limit", 10))
                                 reward_tensor[i_][non_zero_indices] += repetition_penalty
                                 repetition_penalty_list.append(repetition_penalty)
@@ -2121,7 +2040,6 @@ class RayPPOTrainer(object):
                     if (self.global_steps - 1) % 20 == 0:
                         N = self.config.trainer.get("train_generations_to_log_to_wandb_2", 0)
                         if N > 0:
-                            # scoreA_tensor = torch.tensor([batch[i_].non_tensor_batch['reward_model'].get("scoreA", 0.0) for i_ in range(len(batch))])
                             if 'mix' in self.config.reward_model.reward_manager:
                                 self._maybe_log_train_generations_to_wandb(table_attr_name="train_table_2", table_name="generations_varied_instruction", 
                                                                         **self.sample_batch_data(batch, reward_tensor=reward_tensor, scoreA_tensor=scoreA_tensor,
@@ -2164,15 +2082,15 @@ class RayPPOTrainer(object):
 
                     metrics.update(self.compute_final_reward_distribution_metrics(score_list))
 
-                    if 'ce' in self.config.reward_model.reward_manager:
-                        # escape_keys = ['response_mask_ce']
+                    if 'prob' in self.config.reward_model.reward_manager:
+                        # escape_keys = ['response_mask_prob']
                         if self.config.reward_model.get("optimize_think_only", True):
-                            escape_keys = ['response_mask_ce']
+                            escape_keys = ['response_mask_prob']
                         else:
                             escape_keys = []
                         if self.config.actor_rollout_ref.actor.get('use_sft_loss', False):
-                            escape_keys.extend(['ground_truth_mask_ce', 'old_log_probs_ce']) # For SFT loss
-                        batch_keys_rm = [batch_k for batch_k in batch.batch.keys() if (batch_k.endswith('_ce') and batch_k not in escape_keys)]
+                            escape_keys.extend(['ground_truth_mask_prob', 'old_log_probs_prob']) # For SFT loss
+                        batch_keys_rm = [batch_k for batch_k in batch.batch.keys() if (batch_k.endswith('_prob') and batch_k not in escape_keys)]
                         print(f"{batch_keys_rm=}")
                         batch.pop(batch_keys=batch_keys_rm)
 
@@ -2183,25 +2101,14 @@ class RayPPOTrainer(object):
                             actor_output = self.actor_rollout_wg.update_actor(batch) 
                         actor_output_metrics = reduce_metrics(actor_output.meta_info['metrics'])
                         metrics.update(actor_output_metrics)
-                    if 'ce' in self.config.reward_model.reward_manager:
-                        batch_keys_rm = [batch_k for batch_k in batch.batch.keys() if batch_k.endswith('_ce')]
+                    if 'prob' in self.config.reward_model.reward_manager:
+                        batch_keys_rm = [batch_k for batch_k in batch.batch.keys() if batch_k.endswith('_prob')]
                         if len(batch_keys_rm) != 0:
                             batch.pop(batch_keys=batch_keys_rm)
                     
                     # update score_std_list
                     if config_data_filter_accuracy or config_data_filter_truncated:
-                        if self.config.data.get('filter_mode', 'default') == 'aggregation':
-                            assert False
-                            if 'score_std_list' in locals():
-                                score_std_list.extend([batch[i_].batch['final_reward_stds'].item() for i_ in range(len(batch))])
-                                print(f"{len(score_std_list)=}")
-                        elif self.config.data.get('filter_mode', 'default') == 'sliding_window':
-                            assert False
-                            if self.global_steps >= self.config.data.filter_start_step - self.config.data.filter_window_size \
-                               and self.global_steps < self.config.data.filter_start_step:
-                                score_std_list[-1].extend([batch[i_].batch['final_reward_stds'].item() for i_ in range(len(batch))])
-                                print(f"{self.global_steps=} {len(score_std_list)=} {len(score_std_list[-1])}")
-                        elif self.config.data.get('filter_mode', 'default') == 'EMA':
+                        if self.config.data.get('filter_mode', 'default') == 'EMA':
                             if self.global_steps >= self.config.data.filter_ema_start_step \
                                and self.global_steps < self.config.data.filter_start_step:
                                 # score_std_list[-1].extend([batch[i_].batch['final_reward_stds'].item() for i_ in range(len(batch))])
@@ -2386,11 +2293,6 @@ class RayPPOTrainer(object):
                 debug_pos_eos = self.locate_substring_tokens(new_text_rmpad, eos_token_str, self.tokenizer) # list
 
             pos_gt = self.locate_substring_tokens(new_text_rmpad, ground_truth, self.tokenizer, ignore_end_text=eos_token_str) # list
-            # debug = True
-            # if debug:
-            #     print(f"{input_ids.shape=}")
-            #     print(f"{len(pos_gt)=}")
-            #     print(f"{ground_truth=}")
             # Note that if GT is empty, this will report errors.
             ground_truth_ids = input_ids[:, pos_gt[0]:pos_gt[-1] + 1]
             start = (pos_gt[0]) - (pos[-1] + 1)
@@ -2414,31 +2316,7 @@ class RayPPOTrainer(object):
             position_ids = F.pad(position_ids, left_pad_tuple, 'constant', 0)
 
             ground_truth_mask = torch.zeros_like(responses)
-            # ground_truth_mask[:, :ground_truth_ids.shape[-1]] = 1
             ground_truth_mask[:, start:start + ground_truth_ids.shape[-1]] = 1 # Suppose the response is <think> ABC </think> <answer> DEF </answer>. Then the mask is on " DEF ".
-
-            if i % 200 == 0:
-                print(f"{new_text_rmpad=}")
-                print(f"{ground_truth=}")
-                print(f"{ground_truth_ids=}")# tensor([[ 5672, 12738, 26278]])
-                # print(f"Original response that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_ce.bool()])=}") # '<think> The question is asking about the architect who designed the Shard Building, which is the tallest building in London. I need to recall the architect associated with this major landmark. \n\nThe Shard in London is designed by architect Renzo Piano. </think>\n\n'
-                # print(f"Original response || {self.tokenizer.decode(gen_responses[ii]).replace(pad_token_str, '')=}") # '<think> The question is asking about the architect who designed the Shard Building, which is the tallest building in London. I need to recall the architect associated with this major landmark. \n\nThe Shard in London is designed by architect Renzo Piano. </think>\n\n<answer> The architect who designed the Shard Building in London is Renzo Piano. </answer><|im_end|>
-                print(f"New Prompt || {self.tokenizer.decode(prompts[0], skip_special_tokens=True)=}")# 'system\nA conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think> <answer> answer here </answer>.\nuser\nPlease answer this question: Which architect designed the 87-storey Shard Building in London?\nassistant\n<think> The question is asking for the architect of the Shard Building in London. I will need to recall information about famous architecture in London and the Shard Building specifically.\n\nThe Shard Building in London was designed by the Italian architect Renzo Piano. \n\n </think>'
-                print(f"New Response || {self.tokenizer.decode(responses[0], skip_special_tokens=True)=}") # ' <answer> renzo piano </answer>'
-
-                # ground_truth_mask_debug = torch.zeros_like(responses)
-                # if valid_flag:
-                #     ground_truth_mask_debug[:, debug_start:debug_start + debug_ground_truth_ids.shape[-1]] = 1 # Suppose the response is <think> ABC </think> <answer> DEF </answer>. Then the mask is on " DEF ".
-                # print(f"Ground-truth in the new response (using old location) || {self.tokenizer.decode(responses[ground_truth_mask_debug.bool()], skip_special_tokens=False)=}") # ' renzo piano'
-                print(f"Ground-truth in the new response || {self.tokenizer.decode(responses[ground_truth_mask.bool()], skip_special_tokens=False)=}") # ' renzo piano'
-                # debug_ground_truth_mask = torch.zeros_like(responses)
-                # debug_ground_truth_mask[:, :debug_ground_truth_ids.shape[-1]] = 1
-                # print(f"Debug Ground-truth in the new response || {self.tokenizer.decode(responses[debug_ground_truth_mask.bool()], skip_special_tokens=False)=}") # ' renzo piano'
-
-                # original_response_mask = gen_batch_output.batch['attention_mask'][:, -gen_responses.size(1):] # This will be originally used in updating actor
-                # print(f"Original response || {self.tokenizer.decode(gen_responses[ii][original_response_mask[ii].bool()])=}")  # <think> I need to remember that these seem to be names, and I should use a translation tool or my own knowledge of languages to translate them. Unfortunately, as a text-based AI, I might not be able to accurately translate names from one language to another. However, given my own knowledge, it could seem like these are Indian names, with both likely being given names. </think>\n<answer> Tandon, Ravana </answer><|im_end|>
-                print('-'*50)
- 
 
 
 
@@ -2477,7 +2355,6 @@ class RayPPOTrainer(object):
                 scoreA = torch.exp(torch.mean(old_log_probs_in_gt)).item() 
             else:
                 raise ValueError
-            # scoreA_old = float(torch.exp(old_log_prob[ground_truth_mask.bool()].mean(dim=-1)))
             scoreAs_list.append(scoreA)
             old_log_probs_in_gt_list.append(old_log_prob[ground_truth_mask.bool()])
 
@@ -2522,7 +2399,7 @@ class RayPPOTrainer(object):
         # 批量验证格式和构建新文本
         new_texts = []
         valid_flags = []
-        response_mask_ce_lengths = []
+        response_mask_prob_lengths = []
 
         for i in range(batch_size):
             gen_text_rmpad = gen_texts_rmpad[i]
@@ -2605,10 +2482,10 @@ class RayPPOTrainer(object):
             else:
                 indices = (gen_response_batch[i] == self.tokenizer.eos_token_id).nonzero()
                 if indices.numel() > 0:
-                    response_mask_ce_length = indices[0].item()
+                    response_mask_prob_length = indices[0].item()
                 else:
-                    response_mask_ce_length = gen_response_batch[i].shape[-1]
-                response_mask_ce_lengths.append(response_mask_ce_length)
+                    response_mask_prob_length = gen_response_batch[i].shape[-1]
+                response_mask_prob_lengths.append(response_mask_prob_length)
 
                 end_text = (end_think + middle_content + start_answer +
                             leading_whitespace + ground_truth + trailing_whitespace +
@@ -2635,7 +2512,7 @@ class RayPPOTrainer(object):
             pos_endthink_dict = {}
             for idx, pos in zip(valid_indices, valid_pos_endthink):
                 pos_endthink_dict[idx] = pos[-1] if pos else 0
-                response_mask_ce_lengths.append(pos_endthink_dict[idx] + 1 - prompts_batch_shape)
+                response_mask_prob_lengths.append(pos_endthink_dict[idx] + 1 - prompts_batch_shape)
 
         # 批量 tokenize 新文本
         batch_input_data = self.tokenizer(new_texts, return_tensors='pt',
@@ -2646,7 +2523,6 @@ class RayPPOTrainer(object):
         batch_attention_mask = batch_input_data['attention_mask']
 
         # 批量定位 start_answer 和 ground_truth 位置
-        # breakpoint()
         pos_startanswer_batch = self.batch_locate_substring_tokens(new_texts, start_answer)
         pos_gt_batch = self.batch_locate_substring_tokens(new_texts, ground_truth_batch,
                                                      ignore_end_text=end_answer + eos_token_str)
@@ -2708,9 +2584,9 @@ class RayPPOTrainer(object):
                     ground_truth_mask[:, start:start + ground_truth_ids.shape[-1]] = 1
 
                 # 处理 response_mask
-                response_mask_ce = torch.zeros_like(gen_response_batch[i:i + 1])
-                if i < len(response_mask_ce_lengths):
-                    response_mask_ce[:, :response_mask_ce_lengths[i]] = 1
+                response_mask_prob = torch.zeros_like(gen_response_batch[i:i + 1])
+                if i < len(response_mask_prob_lengths):
+                    response_mask_prob[:, :response_mask_prob_lengths[i]] = 1
             else:
                 # 创建默认值
                 prompts = torch.zeros(1, max_length, dtype=torch.long)
@@ -2719,7 +2595,7 @@ class RayPPOTrainer(object):
                 attention_mask = torch.zeros_like(input_ids)
                 position_ids = torch.zeros_like(input_ids)
                 ground_truth_mask = torch.zeros_like(responses)
-                response_mask_ce = torch.zeros_like(gen_response_batch[i:i + 1])
+                response_mask_prob = torch.zeros_like(gen_response_batch[i:i + 1])
 
             # 添加到批次结果
             batch_results[f'prompts{suffix}'].append(prompts[0])
@@ -2728,7 +2604,7 @@ class RayPPOTrainer(object):
             batch_results[f'attention_mask{suffix}'].append(attention_mask[0])
             batch_results[f'position_ids{suffix}'].append(position_ids[0])
             batch_results[f'ground_truth_mask{suffix}'].append(ground_truth_mask[0])
-            batch_results[f'response_mask{suffix}'].append(response_mask_ce[0])
+            batch_results[f'response_mask{suffix}'].append(response_mask_prob[0])
 
         # 转换为张量
         for key in batch_results:
@@ -2777,7 +2653,7 @@ class RayPPOTrainer(object):
     def construct_new_batch_optimized(self, gen_batch_output, ground_truth_list,
                                       start_think='<think>', end_think='</think>',
                                       start_answer='<answer>', end_answer='</answer>',
-                                      suffix='_ce'):
+                                      suffix='_prob'):
         """
         优化后的批处理版本的 construct_new_batch
         """
@@ -2820,9 +2696,9 @@ class RayPPOTrainer(object):
     def construct_new_batch(self, gen_batch_output, ground_truth_list, 
                                   start_think='<think>', end_think='</think>', 
                                   start_answer='<answer>', end_answer='</answer>',
-                                  suffix='_ce'):
+                                  suffix='_prob'):
         """
-            We convert the `input_ids` to a new batch including IAP, `prompts_ce`, `responses_ce` and `ground_truth_mask_ce`.
+            We convert the `input_ids` to a new batch including IAP, `prompts_prob`, `responses_prob` and `ground_truth_mask_prob`.
         """
 
         gen_ids = gen_batch_output.batch['input_ids']     # prompt + response
@@ -2915,22 +2791,21 @@ class RayPPOTrainer(object):
 
                 # NOTE: the calculation below has one issue: if </think> is closely connected to the next string, then it might not be accurately calculated.
                 # For example, <think> aaa </think><answer> xxx </answer>. It is possible we end with "</think><"
-                response_mask_ce_length = pos_endthink_in_original_ids[-1] + 1 - gen_batch_output.batch['prompts'].shape[-1]
+                response_mask_prob_length = pos_endthink_in_original_ids[-1] + 1 - gen_batch_output.batch['prompts'].shape[-1]
                 new_text = end_think.join(gen_text_rmpad.split(end_think)[:-1]) + end_think + middle_content + start_answer + leading_whitespace + ground_truth + trailing_whitespace + end_answer + eos_token_str
-                # new_text = gen_text_rmpad.split(end_think)[0] + end_think + middle_content + start_answer + leading_whitespace + ground_truth + trailing_whitespace + end_answer + eos_token_str
             else:
                 indices = (gen_responses[ii] == self.tokenizer.eos_token_id).nonzero()
                 if indices.numel() > 0:
-                    response_mask_ce_length = indices[0].item()
+                    response_mask_prob_length = indices[0].item()
                 else:
-                    response_mask_ce_length = gen_responses[ii].shape[-1]
+                    response_mask_prob_length = gen_responses[ii].shape[-1]
                 # No matter how we construct this new text, the final score is 0, including the format reward
                 end_text = end_think + middle_content + start_answer + leading_whitespace + ground_truth + trailing_whitespace + end_answer + eos_token_str # \nThe answer is \\boxed{xx}<|im_end|>
                 end_text_ids = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(end_text))
                 new_text = self.tokenizer.decode(gen_ids[ii][:-len(end_text_ids) - 5], skip_special_tokens=False).replace(self.tokenizer.pad_token, "") + end_text
 
-            response_mask_ce = torch.zeros_like(gen_responses[ii])
-            response_mask_ce[:response_mask_ce_length] = 1
+            response_mask_prob = torch.zeros_like(gen_responses[ii])
+            response_mask_prob[:response_mask_prob_length] = 1
 
 
             input_data = self.tokenizer(new_text, return_tensors='pt', add_special_tokens=False)
@@ -2950,14 +2825,6 @@ class RayPPOTrainer(object):
 
             ground_truth_ids = input_ids[:, pos_gt[0]:pos_gt[-1] + 1]
             start = (pos_gt[0]) - (pos_startanswer[0])
-            # else:
-            #     pos_endthink = self.locate_substring_tokens(new_text, end_think, self.tokenizer) # list
-            #     prompts = input_ids[:, :pos_endthink[-1]+1] # ids that ends to the </think>
-            #     responses = input_ids[:, pos_endthink[-1]+1:]
-            #     pos_startanswer = self.locate_substring_tokens(new_text, start_answer, self.tokenizer) # list
-            #     pos_endanswer = self.locate_substring_tokens(new_text, end_answer, self.tokenizer) # list
-            #     ground_truth_ids = input_ids[:, pos_startanswer[-1]+1:pos_endanswer[0]]
-            #     start = (pos_startanswer[-1] + 1) - (pos_endthink[-1] + 1)
 
             # Pad prompts and responses for future packing
             left_pad_tuple = (max_length - prompts.shape[-1], 0)
@@ -2989,22 +2856,17 @@ class RayPPOTrainer(object):
                 print(f"{new_text=}")
                 print(f"{ground_truth_ids=}")# tensor([[ 5672, 12738, 26278]])
                 print(f"{valid_flag=}")
-                # print(f"Original response || {gen_responses_text_rmpad=}")
-                response_mask_ce_shift_left = torch.zeros_like(gen_responses[ii])
-                response_mask_ce_shift_left[:response_mask_ce_length-1] = 1
-                response_mask_ce_shift_right = torch.zeros_like(gen_responses[ii])
-                response_mask_ce_shift_right[:response_mask_ce_length+1] = 1
-                print(f"Original response (shifted left) that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_ce_shift_left.bool()])=}") # '<think> The question is asking for ...  it. </think'
-                print(f"Original response that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_ce.bool()])=}") # '<think> The question is asking about the architect who designed the Shard Building, which is the tallest building in London. I need to recall the architect associated with this major landmark. \n\nThe Shard in London is designed by architect Renzo Piano. </think>\n\n'
-                print(f"Original response (shifted right) that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_ce_shift_right.bool()])=}") # '<think> The question is asking for ... it. </think>\n\n<'
+                response_mask_prob_shift_left = torch.zeros_like(gen_responses[ii])
+                response_mask_prob_shift_left[:response_mask_prob_length-1] = 1
+                response_mask_prob_shift_right = torch.zeros_like(gen_responses[ii])
+                response_mask_prob_shift_right[:response_mask_prob_length+1] = 1
+                print(f"Original response (shifted left) that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_prob_shift_left.bool()])=}") # '<think> The question is asking for ...  it. </think'
+                print(f"Original response that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_prob.bool()])=}") # '<think> The question is asking about the architect who designed the Shard Building, which is the tallest building in London. I need to recall the architect associated with this major landmark. \n\nThe Shard in London is designed by architect Renzo Piano. </think>\n\n'
+                print(f"Original response (shifted right) that will be updated || {self.tokenizer.decode(gen_responses[ii][response_mask_prob_shift_right.bool()])=}") # '<think> The question is asking for ... it. </think>\n\n<'
                 print(f"Original response || {self.tokenizer.decode(gen_responses[ii]).replace(pad_token_str, '')=}") # '<think> The question is asking about the architect who designed the Shard Building, which is the tallest building in London. I need to recall the architect associated with this major landmark. \n\nThe Shard in London is designed by architect Renzo Piano. </think>\n\n<answer> The architect who designed the Shard Building in London is Renzo Piano. </answer><|im_end|>
                 print(f"New Prompt || {self.tokenizer.decode(prompts[0], skip_special_tokens=True)=}")# 'system\nA conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think> <answer> answer here </answer>.\nuser\nPlease answer this question: Which architect designed the 87-storey Shard Building in London?\nassistant\n<think> The question is asking for the architect of the Shard Building in London. I will need to recall information about famous architecture in London and the Shard Building specifically.\n\nThe Shard Building in London was designed by the Italian architect Renzo Piano. \n\n </think>'
                 print(f"New Response || {self.tokenizer.decode(responses[0], skip_special_tokens=True)=}") # ' <answer> renzo piano </answer>'
 
-                # ground_truth_mask_debug = torch.zeros_like(responses)
-                # if valid_flag:
-                #     ground_truth_mask_debug[:, debug_start:debug_start + debug_ground_truth_ids.shape[-1]] = 1 # Suppose the response is <think> ABC </think> <answer> DEF </answer>. Then the mask is on " DEF ".
-                # print(f"Ground-truth in the new response (using old location) || {self.tokenizer.decode(responses[ground_truth_mask_debug.bool()], skip_special_tokens=False)=}") # ' renzo piano'
                 print(f"Ground-truth in the new response || {self.tokenizer.decode(responses[ground_truth_mask.bool()], skip_special_tokens=False)=}") # ' renzo piano'
 
                 original_response_mask = gen_batch_output.batch['attention_mask'][:, -gen_responses.size(1):] # This will be originally used in updating actor
@@ -3016,10 +2878,10 @@ class RayPPOTrainer(object):
                 f'prompts{suffix}': prompts[0], # prompt + ...</think>
                 f'responses{suffix}': responses[0], # </think>+1 ... <eos> (replaced by gt)
                 f'input_ids{suffix}': input_ids[0],  # prompt + response (replaced by gt)
-                f'attention_mask{suffix}': attention_mask[0], # mask prompt + response (replaced by gt) in input_ids_ce
+                f'attention_mask{suffix}': attention_mask[0], # mask prompt + response (replaced by gt) in input_ids_prob
                 f'position_ids{suffix}': position_ids[0], # position ids for prompt + response (replaced by gt)
                 f'ground_truth_mask{suffix}': ground_truth_mask[0], # mask ground_truth in </think>+1 ... <eos>
-                f'response_mask{suffix}': response_mask_ce, # mask begin_response ... </think> in response (replaced by gt)
+                f'response_mask{suffix}': response_mask_prob, # mask begin_response ... </think> in response (replaced by gt)
             }
             data_list.append(row_dict)
         gen_batch_output: DataProto = DataProto.from_single_dict(self.collate_fn(data_list))
