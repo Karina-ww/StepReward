@@ -43,7 +43,7 @@ We introduce the RLPR (Reinforcement Learning with Reference Probability Reward)
 
 <div align="center"> <img src="assets/PR_quality.png" width = 50% /> </div>
 
-We apply RLPR with different training prompt templates  and find it achieves robustness reasoning capability enhancement.
+    We apply RLPR with different training prompt templates  and find it achieves robustness reasoning capability enhancement.
 <div align="center"> <img src="assets/robustness.png" width = 80% /> </div>
 
 
