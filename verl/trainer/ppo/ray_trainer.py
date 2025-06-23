@@ -2101,10 +2101,7 @@ class RayPPOTrainer(object):
                     metrics.update(self.compute_final_reward_distribution_metrics(score_list))
 
                     if 'prob' in self.config.reward_model.reward_manager:
-                        if self.config.reward_model.get("optimize_think_only", True):
-                            escape_keys = ['response_mask_pr']
-                        else:
-                            escape_keys = []
+                        escape_keys = []
                         if self.config.actor_rollout_ref.actor.get('use_sft_loss', False):
                             escape_keys.extend(['ground_truth_mask_pr', 'old_log_probs_pr']) # For SFT loss
                         batch_keys_rm = [batch_k for batch_k in batch.batch.keys() if (batch_k.endswith('_pr') and batch_k not in escape_keys)]
