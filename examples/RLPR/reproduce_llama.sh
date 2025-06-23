@@ -84,7 +84,7 @@ python -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
-    data.train_batch_size=768 \
+    data.train_batch_size=256 \
     data.max_prompt_length=2048 \
     data.max_response_length=3072 \
     +data.filter_accuracy=True \
@@ -95,7 +95,7 @@ python -m verl.trainer.main_ppo \
     +data.filter_mode=EMA \
     +data.filter_target=final_reward_std \
     +data.accuracy_lower_bound=0 \
-    +data.accuracy_lower_bound_ratio=0.5 \
+    +data.accuracy_lower_bound_ratio=0.9 \
     +data.accuracy_upper_bound=1000000 \
     +data.filter_cache_regenerate=True \
     actor_rollout_ref.rollout.temperature=0.6 \
@@ -103,7 +103,7 @@ python -m verl.trainer.main_ppo \
     actor_rollout_ref.model.path=$MODEL \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
-    actor_rollout_ref.actor.ppo_mini_batch_size=192 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=64 \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
     actor_rollout_ref.actor.ppo_max_token_len_per_gpu=24000 \
     actor_rollout_ref.actor.use_kl_loss=True \
