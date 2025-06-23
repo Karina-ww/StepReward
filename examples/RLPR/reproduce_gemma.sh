@@ -87,7 +87,7 @@ python -m verl.trainer.main_ppo \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=256 \
-    data.max_prompt_length=2048 \
+    data.max_prompt_length=1024 \
     data.max_response_length=3072 \
     +data.filter_accuracy=True \
     +data.filter_truncated=False \
@@ -138,8 +138,6 @@ python -m verl.trainer.main_ppo \
     reward_model.reward_manager=prob \
     +reward_model.reward_manager_shaping_function_name=threshold_0 \
     +reward_model.compute_score_name=mean_exp_log_softmax \
-    +reward_model.version=v2.1 \
-    +reward_model.optimize_think_only=False \
     +reward_model.repetition_penalty=True \
     +reward_model.val_reward_manager=naive \
     +reward_model.format_mode=R1_nothink \
