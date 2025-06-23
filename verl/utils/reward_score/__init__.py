@@ -142,7 +142,7 @@ def _default_compute_score(data_source, solution_str, ground_truth, extra_info=N
  
     elif any(dataset_name in data_source for dataset_name in ["numina_cn_k12", "numina_synthetic_math", "numina_olympiads", 
                                                               "numina_synthetic_amc", "numina_aops_forum", "numina_amc_aime",
-                                                              "Math-500", "AIME2024", "AIME2025", "AMC2023", "DAPO-Math-17k", 
+                                                              "Math-500", "AIME2024", "AMC2023", "DAPO-Math-17k", 
                                                               "WebInstruct-verified", "orz_math_57k_collection", "MATH",
                                                               'OlympiadBench', "Minerva", "TheoremQA", "simplelr_deepscaler",
                                                               "allenai-tulu-3-sft-mixture-train-tulu_v3.9_wildchat_100k", "allenai-tulu-3-sft-mixture-train-personahub_ifdata_manual_seed_v3_29980",
@@ -232,7 +232,7 @@ def get_raw_question_from_prompt(prompt_str):
         question = question.split('Question:\n')[1]
     
     question = question.replace('Format your response as follows: "The correct answer is (insert answer here)"', '') # WebInstruct-verified-OC, gpqa_diamond-OC
-    question = question.replace(r'Please reason step by step, and put your final answer within \boxed{}.', '') # AIME2025-OC, AMC2023-OC, AIME2024-OC
+    question = question.replace(r'Please reason step by step, and put your final answer within \boxed{}.', '') 
     question = question.strip()
     if 'What is the correct answer to this question: ' in question:
         question = question.replace('What is the correct answer to this question: ', '')

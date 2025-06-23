@@ -999,13 +999,7 @@ class RayPPOTrainer(object):
             result.update(result_greedy)
         if 'sampling' in test_decoding_strategy and 'greedy' in test_decoding_strategy:
             for data_source_set in [
-                ['AIME2024-avg16', 'AIME2025-avg16', 'AMC2023-avg16', 'Math-500-avg2', 'gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2', 'WebInstruct-verified-val-avg2'],
-                ['AIME2024-avg16', 'AIME2025-avg16', 'AMC2023-avg16', 'Math-500-avg2'],
-                ['gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2', 'WebInstruct-verified-val-avg2'],
-                
-                ['mmlu_pro-test-1000-avg2', 'Math-500-avg2', 'gpqa_diamond-avg4', 'AIME2024-avg16', 'AMC2023-avg16', 'AIME2025-avg16', 'WebInstruct-verified-val-avg2', 'SuperGPQA', 'OlympiadBench-OE_TO_maths_en_COMP', 'Minerva', 'TheoremQA'],
-                ['mmlu_pro-test-1000-avg2', 'gpqa_diamond-avg4',  'TheoremQA','WebInstruct-verified-val-avg2'],
-                ['Minerva', 'OlympiadBench-OE_TO_maths_en_COMP', 'Math-500-avg2',  'AIME2024-avg16'],
+                ['MMLUPro-1000_Avg2', 'gpqa_diamond_Avg4',  'TheoremQA_Avg2','WebInstruct-verified-val_Avg2'],
             ]:
                 result_best = []
                 for val_set in data_source_set:
@@ -1162,16 +1156,7 @@ class RayPPOTrainer(object):
         
 
         for data_source_set in [
-            ['AIME2024', 'AIME2025', 'AMC2023', 'Math-500', 'gpqa_diamond', 'mmlu_pro-test-1000', 'WebInstruct-verified-val'],
-            ['Math-500', 'gpqa_diamond', 'mmlu_pro-test-1000'],
-
-            ['AIME2024-avg16', 'AIME2025-avg16', 'AMC2023-avg16', 'Math-500-avg2', 'gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2', 'WebInstruct-verified-val-avg2'],
-            ['AIME2024-avg16', 'AIME2025-avg16', 'AMC2023-avg16', 'Math-500-avg2'],
-            ['gpqa_diamond-avg4', 'mmlu_pro-test-1000-avg2', 'WebInstruct-verified-val-avg2'],
-
-            ['mmlu_pro-test-1000-avg2', 'Math-500-avg2', 'gpqa_diamond-avg4', 'AIME2024-avg16', 'AMC2023-avg16', 'AIME2025-avg16', 'WebInstruct-verified-val-avg2', 'SuperGPQA', 'OlympiadBench-OE_TO_maths_en_COMP', 'Minerva', 'TheoremQA'],
-            ['mmlu_pro-test-1000-avg2', 'gpqa_diamond-avg4',  'TheoremQA','WebInstruct-verified-val-avg2'],
-            ['Minerva', 'OlympiadBench-OE_TO_maths_en_COMP', 'Math-500-avg2',  'AIME2024-avg16'],
+            ['MMLUPro-1000_Avg2', 'gpqa_diamond_Avg4',  'TheoremQA_Avg2','WebInstruct-verified-val_Avg2'],
         ]:
             for suffix in suffixes:
                 self.compute_and_store_means(metric_dict, data_source_set, suffix, decoding_strategy)
@@ -1185,7 +1170,7 @@ class RayPPOTrainer(object):
                     if len(acc_list) > 0:
                         metric_dict[f'val_mean_{decoding_strategy}/test_acc/best-mean_{"+".join([source for source in data_source_set])}'] = np.mean(acc_list)
 
-        return metric_dict #, data_source_set
+        return metric_dict
 
     def compute_and_store_means(self, metric_dict, data_source_set, suffix, decoding_strategy=None):
         specific_mean = self.compute_specific_means(metric_dict, [f'{source}-{suffix}' for source in data_source_set], decoding_strategy=decoding_strategy)
@@ -1361,7 +1346,7 @@ class RayPPOTrainer(object):
         self.global_steps = int(global_step_folder.split('global_step_')[-1])
 
         print(f'Setting global step to {self.global_steps}')
-        print(f'Resuming from {global_step_folder}') # Example: /data/checkpoints/verl/qwen2_esl_th0.10_e1_D1/global_step_50
+        print(f'Resuming from {global_step_folder}') 
 
 
 
@@ -2389,9 +2374,6 @@ class RayPPOTrainer(object):
         gen_response_texts = self.tokenizer.batch_decode(gen_response_batch, skip_special_tokens=False)
 
         # 批量处理文本清理
-        # gen_texts_rmpad = [text.replace(pad_token_str, '') for text in gen_texts]
-        # gen_response_texts_rmpad = [text.replace(pad_token_str, '') for text in gen_response_texts]
-        # gen_text_rmpad = replace_left_and_right_str(gen_text, pad_token_str)
         gen_texts_rmpad = [replace_left_and_right_str(text, pad_token_str) for text in gen_texts]
         gen_response_texts_rmpad = [replace_left_and_right_str(text, pad_token_str) for text in gen_response_texts]
 
@@ -2406,7 +2388,6 @@ class RayPPOTrainer(object):
         # 批量验证格式和构建新文本
         new_texts = []
         valid_flags = []
-        # response_mask_pr_lengths = []
 
         for i in range(batch_size):
             gen_text_rmpad = gen_texts_rmpad[i]
@@ -2478,13 +2459,6 @@ class RayPPOTrainer(object):
                                 leading_whitespace + ground_truth + trailing_whitespace + 
                                 end_answer + eos_token_str)
             else:
-                indices = (gen_response_batch[i] == self.tokenizer.eos_token_id).nonzero()
-                # if indices.numel() > 0:
-                #     response_mask_pr_length = indices[0].item()
-                # else:
-                #     response_mask_pr_length = gen_response_batch[i].shape[-1]
-                # response_mask_pr_lengths.append(response_mask_pr_length)
-
                 if self.config.reward_model.get('format_mode', 'R1') == 'R1':
                     end_text = (end_think + middle_content + start_answer +
                                 leading_whitespace + ground_truth + trailing_whitespace +
@@ -2502,21 +2476,6 @@ class RayPPOTrainer(object):
             new_texts.append(new_text)
             valid_flags.append(valid_flag)
 
-        # 批量定位有效响应的 end_think 位置
-        # valid_indices = [i for i, flag in enumerate(valid_flags) if flag]
-        # valid_new_texts = [new_texts[i] for i in valid_indices]
-
-        # if valid_new_texts:
-        #     # 批量定位 end_think 位置
-        #     valid_pos_endthink = self.batch_locate_substring_tokens(
-        #         valid_new_texts, end_think
-        #     )
-
-            # 将结果映射回原始索引
-            # pos_endthink_dict = {}
-            # for idx, pos in zip(valid_indices, valid_pos_endthink):
-            #     pos_endthink_dict[idx] = pos[-1] if pos else 0
-                # response_mask_pr_lengths.append(pos_endthink_dict[idx] + 1 - prompts_batch_shape)
 
         # 批量 tokenize 新文本
         batch_input_data = self.tokenizer(new_texts, return_tensors='pt',
@@ -2545,7 +2504,6 @@ class RayPPOTrainer(object):
             f'attention_mask{suffix}': [],
             f'position_ids{suffix}': [],
             f'ground_truth_mask{suffix}': [],
-            # f'response_mask{suffix}': []
         }
 
         for i in range(batch_size):
@@ -2587,10 +2545,6 @@ class RayPPOTrainer(object):
                 if valid_flags[i]:
                     ground_truth_mask[:, start:start + ground_truth_ids.shape[-1]] = 1
 
-                # 处理 response_mask
-                # response_mask_pr = torch.zeros_like(gen_response_batch[i:i + 1])
-                # if i < len(response_mask_pr_lengths):
-                #     response_mask_pr[:, :response_mask_pr_lengths[i]] = 1
             else:
                 # 创建默认值
                 prompts = torch.zeros(1, max_length, dtype=torch.long)
@@ -2599,7 +2553,6 @@ class RayPPOTrainer(object):
                 attention_mask = torch.zeros_like(input_ids)
                 position_ids = torch.zeros_like(input_ids)
                 ground_truth_mask = torch.zeros_like(responses)
-                # response_mask_pr = torch.zeros_like(gen_response_batch[i:i + 1])
 
             # 添加到批次结果
             batch_results[f'prompts{suffix}'].append(prompts[0])
@@ -2608,7 +2561,6 @@ class RayPPOTrainer(object):
             batch_results[f'attention_mask{suffix}'].append(attention_mask[0])
             batch_results[f'position_ids{suffix}'].append(position_ids[0])
             batch_results[f'ground_truth_mask{suffix}'].append(ground_truth_mask[0])
-            # batch_results[f'response_mask{suffix}'].append(response_mask_pr[0])
 
         # 转换为张量
         for key in batch_results:
@@ -2685,13 +2637,6 @@ class RayPPOTrainer(object):
             max_length,
             suffix
         )
-
-        # 调试输出（每100个样本输出一次）
-        # for ii in range(0, len(gen_ids), 100):
-            # print(f"Batch processing sample {ii}")
-            # sample_dict = {key: batch_results[key][ii] for key in batch_results}
-            # print(sample_dict)
-            # print('-' * 50)
 
         gen_batch_output: DataProto = DataProto.from_single_dict(batch_results)
         self.tokenizer = self.tokenizer.tokenizer

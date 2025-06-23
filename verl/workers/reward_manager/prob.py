@@ -328,7 +328,7 @@ class ProbRewardManager:
         data_source = data_item.non_tensor_batch['data_source']
         if self.reward_type == 'pr+vr' and (any(dataset_name in data_source for dataset_name in ["numina_cn_k12", "numina_synthetic_math", "numina_olympiads", 
                                                                 "numina_synthetic_amc", "numina_aops_forum", "numina_amc_aime",
-                                                                "Math-500", "AIME2024", "AIME2025", "AMC2023", "DAPO-Math-17k",
+                                                                "Math-500", "AIME2024", "AMC2023", "DAPO-Math-17k",
                                                                 "OlympiadBench", "Minerva", "simplelr_deepscaler"])):
 
             ground_truth = data_item.non_tensor_batch['reward_model']['ground_truth']
