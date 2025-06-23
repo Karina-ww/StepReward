@@ -6,7 +6,7 @@
 
 <div align="center" style="font-size: 15pt">
 
-<a href='https://arxiv.org'><img src='https://img.shields.io/badge/Paper-PDF-purple'></a>
+<a href='https://github.com/OpenBMB/RLPR/blob/main/RLPR_paper.pdf'><img src='https://img.shields.io/badge/Paper-PDF-purple'></a>
 <a href='https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset'><img src='https://img.shields.io/badge/Dataset-Train-Green'></a>
 <a href='https://huggingface.co/collections/openbmb/rlpr-6857fa5d22cbe64327a3f8f6'><img src='https://img.shields.io/badge/Model-Qwen_Llama_Gemma-orange'></a>
 
@@ -20,7 +20,7 @@
 
 ## 🎊 更新日志 <!-- omit in toc -->
 
-- [2025.06.23] 我们开源了 RLPR 的代码、[权重](https://huggingface.co/openbmb/RLPR-Qwen2.5-7B-Base)和[数据](https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset)！
+- [2025.06.23] 我们开源了 RLPR 的代码、[权重](https://huggingface.co/openbmb/RLPR-Qwen2.5-7B-Base)、[数据](https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset)和[论文](https://github.com/OpenBMB/RLPR/blob/main/RLPR_paper.pdf)！
 
 ## 📜 简介 <!-- omit in toc -->
 
