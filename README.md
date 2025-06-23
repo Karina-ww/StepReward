@@ -85,12 +85,12 @@ huggingface-cli download --repo-type dataset --resume-download openbmb/RLPR-Trai
 huggingface-cli download --repo-type dataset --resume-download openbmb/RLPR-Evaluation --local-dir ./datasets/test
 ```
 
-2. Specify the base model path `examples/RLPR/reproduce.sh`.
+2. Specify the base model path `examples/RLPR/reproduce_<model>.sh`.
 ```bash
 MODEL=path_to_base_model
 ```
 
-3. (Optional) Login wandb and set USE_WANDB to True in the `examples/RLPR/reproduce.sh` if you want to use wandb for logging.
+3. (Optional) Login wandb and set USE_WANDB to True in the `examples/RLPR/reproduce_<model>.sh` if you want to use wandb for logging.
 
 ```bash
 USE_WANDB=${USE_WANDB:-"false"}
@@ -104,7 +104,7 @@ USE_WANDB=${USE_WANDB:-"false"}
 	        bash scripts/setup_server.sh
 	        ```
 	        
-	    2. Specify the judge model in the `examples/RLPR/reproduce.sh`.
+	    2. Specify the judge model in the `examples/RLPR/reproduce_<model>.sh`.
 	        
 	        ```shell
 	        export CLIENT_IP=http://127.0.0.1:8001
@@ -112,7 +112,7 @@ USE_WANDB=${USE_WANDB:-"false"}
 	        ```
 	- API-Based Model (gpt-4o / 4pt-4.1) as judge 
 		
-        Specify token and the judge model in the `examples/RLPR/reproduce.sh` to use OpenAI API.
+        Specify token and the judge model in the `examples/RLPR/reproduce_<model>.sh` to use OpenAI API.
         
         ```shell
         export OPENAI_API_KEY=your_api_token
