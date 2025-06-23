@@ -119,7 +119,9 @@
 5.  运行训练脚本
 
     ```shell
-    bash examples/RLPR/reproduce.sh
+    bash examples/RLPR/reproduce_qwen.sh
+    # bash examples/RLPR/reproduce_llama.sh
+    # bash examples/RLPR/reproduce_gemma.sh
     ```
 
 ## 评估
@@ -129,7 +131,9 @@
 2.  运行评估脚本
 
     ```shell
-    bash examples/RLPR/reproduce.sh +trainer.val_only=True
+    bash examples/RLPR/reproduce_qwen.sh +trainer.val_only=True
+    # bash examples/RLPR/reproduce_llama.sh +trainer.val_only=True
+    # bash examples/RLPR/reproduce_gemma.sh +trainer.val_only=True
     ```
 
 ## 许可证 <!-- omit in toc -->

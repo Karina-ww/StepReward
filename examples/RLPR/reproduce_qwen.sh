@@ -6,7 +6,7 @@ USE_WANDB=${USE_WANDB:-"false"}
 
 # Basic Project Settings
 WANDB_PRJ_NAME=rlpr
-EXP_NAME=reproduce
+EXP_NAME=reproduce_qwen
 MODEL=path_to_base_model
 N_GPUS_PER_NODE=8
 
