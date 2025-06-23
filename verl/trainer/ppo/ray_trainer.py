@@ -616,6 +616,8 @@ class RayPPOTrainer(object):
         if any(text in self.config.actor_rollout_ref.model.path.lower() for text in ['llama', 'gemma']):
             # llama/gemma tokenizer does not support truncation, so we use 'error' to raise error when the prompt is too long
             # for files in [eval(self.config.data.train_files), eval(self.config.data.val_files)]:
+            
+            assert self.config.reward_model.get('format_mode', 'R1') == 'R1_nothink' # we only support R1_nothink for llama and gemma
             self.config.data.train_files = self.config.data.train_files if isinstance(self.config.data.train_files, (List, ListConfig)) else [self.config.data.train_files]
             self.config.data.val_files = self.config.data.val_files if isinstance(self.config.data.val_files, (List, ListConfig)) else [self.config.data.val_files]
             for files in [self.config.data.train_files, self.config.data.val_files]:
@@ -2425,7 +2427,7 @@ class RayPPOTrainer(object):
                 start_answer_count = gen_response_text_rmpad.count(start_answer_tag)
                 if self.config.reward_model.get('format_mode', 'R1') == 'R1':
                     pattern = r'^.*' + start_think + r'.*' + end_think + r'.*' + start_answer_tag + r'.*$'
-                elif self.config.reward_model.get('format_mode', 'R1') == 'answer':
+                elif self.config.reward_model.get('format_mode', 'R1') == 'R1_nothink':
                     pattern = r'^.*' + start_answer_tag + r'.*$'
                 valid_flag = (
                         start_answer_count == 1 and
@@ -2482,7 +2484,7 @@ class RayPPOTrainer(object):
                                 end_think + middle_content + start_answer +
                                 leading_whitespace + ground_truth + trailing_whitespace +
                                 end_answer + eos_token_str)
-                elif self.config.reward_model.get('format_mode', 'R1') == 'answer':
+                elif self.config.reward_model.get('format_mode', 'R1') == 'R1_nothink':
                     new_text = (start_answer.join(gen_text_rmpad.split(start_answer)[:-1]) + 
                                 start_answer +
                                 leading_whitespace + ground_truth + trailing_whitespace + 
@@ -2499,7 +2501,7 @@ class RayPPOTrainer(object):
                     end_text = (end_think + middle_content + start_answer +
                                 leading_whitespace + ground_truth + trailing_whitespace +
                                 end_answer + eos_token_str)
-                elif self.config.reward_model.get('format_mode', 'R1') == 'answer':
+                elif self.config.reward_model.get('format_mode', 'R1') == 'R1_nothink':
                     end_text = (start_answer + 
                                 leading_whitespace + ground_truth + trailing_whitespace + 
                                 end_answer + eos_token_str)

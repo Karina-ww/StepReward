@@ -142,5 +142,5 @@ python -m verl.trainer.main_ppo \
     +reward_model.optimize_think_only=False \
     +reward_model.repetition_penalty=True \
     +reward_model.val_reward_manager=naive \
-    +reward_model.format_mode=answer \
+    +reward_model.format_mode=R1_nothink \
     "$@"
