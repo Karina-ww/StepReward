@@ -85,7 +85,7 @@ huggingface-cli download --repo-type dataset --resume-download openbmb/RLPR-Trai
 huggingface-cli download --repo-type dataset --resume-download openbmb/RLPR-Evaluation --local-dir ./datasets/test
 ```
 
-2. Specify the base model path `examples/RLPR/reproduce_<model>.sh`.
+2. Specify the base model path `examples/RLPR/reproduce_<model>.sh`, where `<model>` can be `qwen`, `llama` and `gemma`.
 ```bash
 MODEL=path_to_base_model
 ```

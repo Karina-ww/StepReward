@@ -81,12 +81,12 @@
     huggingface-cli download --repo-type dataset --resume-download openbmb/RLPR-Evaluation --local-dir ./datasets/test
     ```
 
-2.  在 `examples/RLPR/reproduce.sh` 中指定基座模型路径。
+2.  在 `examples/RLPR/reproduce_<model>.sh` 中指定基座模型路径，其中`<model>`可以选择`qwen`、`llama`和`gemma`。
     ```bash
     MODEL=path_to_base_model
     ```
 
-3.  (可选) 如果您想使用 wandb 进行日志记录，请登录 wandb 并在 `examples/RLPR/reproduce.sh` 中将 `USE_WANDB` 设置为 `True`。
+3.  (可选) 如果您想使用 wandb 进行日志记录，请登录 wandb 并在 `examples/RLPR/reproduce_<model>.sh` 中将 `USE_WANDB` 设置为 `True`。
 
     ```bash
     USE_WANDB=${USE_WANDB:-"false"}
@@ -100,7 +100,7 @@
             bash scripts/setup_server.sh
             ```
 
-        2.  在 `examples/RLPR/reproduce.sh` 中指定评估模型。
+        2.  在 `examples/RLPR/reproduce_<model>.sh` 中指定评估模型。
 
             ```shell
             export CLIENT_IP=http://127.0.0.1:8001
