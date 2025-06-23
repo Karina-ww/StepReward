@@ -3077,7 +3077,8 @@ class RayPPOTrainer(object):
         think_lengths = []
         answer_lengths = []
         
-        pattern = re.compile(r'.*<think>(.*)</think>.*<answer>(.*)</answer>.*', re.DOTALL)
+        # pattern = re.compile(r'.*<think>(.*)</think>.*<answer>(.*)</answer>.*', re.DOTALL)
+        pattern = re.compile(r'(.*)<answer>(.*)</answer>.*', re.DOTALL)
         
         for text in output_texts:
             match = pattern.fullmatch(text)
