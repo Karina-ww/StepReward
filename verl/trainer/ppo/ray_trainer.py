@@ -1011,7 +1011,6 @@ class RayPPOTrainer(object):
                     if len(acc_list) != 0:
                         result_best.append(max(acc_list))
                 if len(result_best) == len(data_source_set):
-                    # result.update({f'val_mean/test_acc/best-mean_{"+".join([source.split("-")[0] for source in data_source_set])}': sum(result_best) / len(result_best)})
                     result.update({f'val_mean/test_acc/best-mean_{"+".join([source for source in data_source_set])}': sum(result_best) / len(result_best)})
                 print(f"{result_best=} {data_source_set=}")
         return result

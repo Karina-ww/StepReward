@@ -62,7 +62,7 @@
 
 1.  克隆本仓库并进入 RLPR 文件夹
     ```bash
-    git clone 
+    git clone https://github.com/OpenBMB/RLPR.git
     cd RLPR
     ```
 

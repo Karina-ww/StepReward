@@ -66,7 +66,7 @@ We present the [RLPR Train Dataset](https://huggingface.co/datasets/openbmb/RLP
 
 1. Clone this repository and navigate to RLPR folder
 ```bash
-git clone 
+git clone https://github.com/OpenBMB/RLPR.git
 cd RLPR
 ```
 
