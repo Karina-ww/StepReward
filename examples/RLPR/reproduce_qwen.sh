@@ -134,7 +134,6 @@ python -m verl.trainer.main_ppo \
     reward_model.reward_manager=prob \
     +reward_model.reward_manager_shaping_function_name=threshold_0 \
     +reward_model.compute_score_name=mean_exp_log_softmax \
-    +reward_model.version=v2.1 \
     +reward_model.repetition_penalty=True \
     +reward_model.val_reward_manager=naive \
     +reward_model.format_mode=R1 \

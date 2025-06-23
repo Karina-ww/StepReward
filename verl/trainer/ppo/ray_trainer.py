@@ -2418,50 +2418,41 @@ class RayPPOTrainer(object):
                 end_think_count = gen_response_text_rmpad.count(end_think)
             middle_content, leading_whitespace, trailing_whitespace = ' ', ' ', ' '
 
-            # 格式验证逻辑（保持与原方法一致）
-            if self.config.reward_model.get("version", None) == 'v2.1':
-                start_answer_tag = '<answer>'
-                start_answer_count = gen_response_text_rmpad.count(start_answer_tag)
-                if self.config.reward_model.get('format_mode', 'R1') == 'R1':
-                    pattern = r'^.*' + start_think + r'.*' + end_think + r'.*' + start_answer_tag + r'.*$'
-                elif self.config.reward_model.get('format_mode', 'R1') == 'R1_nothink':
-                    pattern = r'^.*' + start_answer_tag + r'.*$'
+            start_answer_tag = '<answer>'
+            start_answer_count = gen_response_text_rmpad.count(start_answer_tag)
+            if self.config.reward_model.get('format_mode', 'R1') == 'R1':
+                pattern = r'^.*' + start_think + r'.*' + end_think + r'.*' + start_answer_tag + r'.*$'
+            elif self.config.reward_model.get('format_mode', 'R1') == 'R1_nothink':
+                pattern = r'^.*' + start_answer_tag + r'.*$'
+            valid_flag = (
+                    start_answer_count == 1 and
+                    (re.fullmatch(pattern, gen_response_text_rmpad, re.DOTALL) is not None)
+            )
+            if self.config.reward_model.get('format_mode', 'R1') == 'R1':
                 valid_flag = (
-                        start_answer_count == 1 and
-                        (re.fullmatch(pattern, gen_response_text_rmpad, re.DOTALL) is not None)
+                    valid_flag and 
+                    start_think_count == 1 and
+                    end_think_count == 1
                 )
+
+            if valid_flag:
                 if self.config.reward_model.get('format_mode', 'R1') == 'R1':
-                    valid_flag = (
-                        valid_flag and 
-                        start_think_count == 1 and
-                        end_think_count == 1
-                    )
+                    middle_content = gen_response_text_rmpad.split(end_think)[1].split(start_answer_tag)[0]
+                answer_section = gen_response_text_rmpad.split(start_answer_tag)[1]
 
-                if valid_flag:
-                    if self.config.reward_model.get('format_mode', 'R1') == 'R1':
-                        middle_content = gen_response_text_rmpad.split(end_think)[1].split(start_answer_tag)[0]
-                    answer_section = gen_response_text_rmpad.split(start_answer_tag)[1]
-
-                    if not answer_section.strip():
-                        valid_flag = False
-                    else:
-                        leading_whitespace = ''
-                        for char in answer_section:
-                            if char in [' ', '\n', '\t', '\r']:
-                                leading_whitespace += char
-                            else:
-                                break
-                        if self.config.reward_model.get("gt_tokens_one_more", False):
-                            match = re.search('(\s*)</answer>', answer_section)
-                            if match:
-                                trailing_whitespace = match.group(1)
-            else:
-                valid_flag = (
-                        start_think_count == 1 and
-                        end_think_count == 1 and
-                        start_think in gen_response_text_rmpad and
-                        end_think in gen_response_text_rmpad.split(start_think)[-1]
-                )
+                if not answer_section.strip():
+                    valid_flag = False
+                else:
+                    leading_whitespace = ''
+                    for char in answer_section:
+                        if char in [' ', '\n', '\t', '\r']:
+                            leading_whitespace += char
+                        else:
+                            break
+                    if self.config.reward_model.get("gt_tokens_one_more", False):
+                        match = re.search('(\s*)</answer>', answer_section)
+                        if match:
+                            trailing_whitespace = match.group(1)
 
             # 处理空白字符
             if not self.config.reward_model.get("allow_empty_leading_whitespaces", False):
