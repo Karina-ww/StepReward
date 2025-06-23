@@ -1599,7 +1599,7 @@ class RayPPOTrainer(object):
                                             print('Encounter NaN or Inf std!', flush=True)
                                 print(f"{ema_mean=} for {self.global_steps=}")
                                 
-                                self.config.data.accuracy_lower_bound = ema_mean * self.config.data.accuracy_lower_bound_ratio
+                                self.config.data.accuracy_lower_bound = ema_mean * self.config.data.std_filter_beta
                             score_std_list.append([])
 
 
@@ -1769,19 +1769,19 @@ class RayPPOTrainer(object):
                                     # final_reward_std_ = batch[i_].batch['final_reward_stds'].item()
                                     filter_target = [batch[i_].batch['final_reward_stds'].item() for i_ in range(len(batch))]
 
-                                    if self.config.data.get('accuracy_lower_bound_ratio_per_data_source', None):
-                                        accuracy_lower_bound_ratio_per_data_source = self.config.data.get('accuracy_lower_bound_ratio_per_data_source', None) # WebInstruct-verified_is_1+DAPO-Math-17k_is_1.25
+                                    if self.config.data.get('std_filter_beta_per_data_source', None):
+                                        std_filter_beta_per_data_source = self.config.data.get('std_filter_beta_per_data_source', None) # WebInstruct-verified_is_1+DAPO-Math-17k_is_1.25
                                         # Split the string into key-value pairs
-                                        kvs = [pair.split('_is_') for pair in accuracy_lower_bound_ratio_per_data_source.split('+')]
-                                        dict_accuracy_lower_bound_ratio_per_data_source = {key: float(value) for key, value in kvs}
-                                        print(f"{dict_accuracy_lower_bound_ratio_per_data_source=}")
+                                        kvs = [pair.split('_is_') for pair in std_filter_beta_per_data_source.split('+')]
+                                        dict_std_filter_beta_per_data_source = {key: float(value) for key, value in kvs}
+                                        print(f"{dict_std_filter_beta_per_data_source=}")
 
                                         # [data_source_ = batch[i_].non_tensor_batch['data_source']]
                                         print(f"Before scaling: {filter_target=}")
                                         print(f"Data source: {[batch[i_].non_tensor_batch['data_source'] for i_ in range(len(batch))]}")
-                                        filter_target = [filter_target[i_] * dict_accuracy_lower_bound_ratio_per_data_source[batch[i_].non_tensor_batch['data_source']]  for i_ in range(len(filter_target))]
+                                        filter_target = [filter_target[i_] * dict_std_filter_beta_per_data_source[batch[i_].non_tensor_batch['data_source']]  for i_ in range(len(filter_target))]
                                         print(f"After scaling: {filter_target=}")
-                                        # filter_target = [filter_target[i_] * dict_accuracy_lower_bound_ratio_per_data_source[batch[i_].non_tensor_batch['data_source']]  for i_ in range(len(filter_target))]
+                                        # filter_target = [filter_target[i_] * dict_std_filter_beta_per_data_source[batch[i_].non_tensor_batch['data_source']]  for i_ in range(len(filter_target))]
 
 
                                     if self.config.data.get('filter_mode', 'default') == 'EMA':

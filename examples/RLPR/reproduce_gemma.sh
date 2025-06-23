@@ -97,7 +97,7 @@ python -m verl.trainer.main_ppo \
     +data.filter_mode=EMA \
     +data.filter_target=final_reward_std \
     +data.accuracy_lower_bound=0 \
-    +data.accuracy_lower_bound_ratio=1.0 \
+    +data.std_filter_beta=1.0 \
     +data.accuracy_upper_bound=1000000 \
     +data.filter_cache_regenerate=True \
     actor_rollout_ref.rollout.temperature=0.6 \
