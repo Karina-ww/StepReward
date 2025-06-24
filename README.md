@@ -6,7 +6,7 @@
 
 <div align="center" style="font-size: 15pt">
 
-<a href='https://github.com/OpenBMB/RLPR/blob/main/RLPR_paper.pdf'><img src='https://img.shields.io/badge/Paper-PDF-purple'></a>
+<a href='https://arxiv.org/abs/2506.18254'><img src='https://img.shields.io/badge/Paper-PDF-purple'></a>
 <a href='https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset'><img src='https://img.shields.io/badge/Dataset-Train-Green'></a>
 <a href='https://huggingface.co/collections/openbmb/rlpr-6857fa5d22cbe64327a3f8f6'><img src='https://img.shields.io/badge/Model-Qwen_Llama_Gemma-orange'></a>
 
@@ -21,7 +21,7 @@
 
 ## 🎊 News <!-- omit in toc -->
 
-- [2025.06.23] We open-source the code, [weights](https://huggingface.co/openbmb/RLPR-Qwen2.5-7B-Base), [data](https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset) and [paper](https://github.com/OpenBMB/RLPR/blob/main/RLPR_paper.pdf) of RLPR!
+- [2025.06.23] We open-source the code, [weights](https://huggingface.co/openbmb/RLPR-Qwen2.5-7B-Base), [data](https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset) and [paper](https://arxiv.org/abs/2506.18254) of RLPR!
 
 
 ## 📜 Brief Introduction <!-- omit in toc -->
@@ -160,10 +160,13 @@ bash examples/RLPR/reproduce_qwen.sh +trainer.val_only=True
 If you find our model/code/data/paper helpful, please consider cite our papers 📝 and star us ⭐️！
 
 ```bibtex
-@article{yu2025rlpr,
-  title={RLPR: Extrapolating RLVR to General Domains without Verifiers},
-  author={Yu, Tianyu and Ji, Bo and Wang, Shouli and Yao, Shu and Wang, Zefan and Cui, Ganqu and Yuan, Lifan and Ding, Ning and Yao, Yuan and Liu, Zhiyuan and Sun, Maosong and Chua, Tat-Seng},
-  journal={arXiv preprint arXiv:2506.xxxxx},
-  year={2025}
+@misc{yu2025rlprextrapolatingrlvrgeneral,
+      title={RLPR: Extrapolating RLVR to General Domains without Verifiers}, 
+      author={Tianyu Yu and Bo Ji and Shouli Wang and Shu Yao and Zefan Wang and Ganqu Cui and Lifan Yuan and Ning Ding and Yuan Yao and Zhiyuan Liu and Maosong Sun and Tat-Seng Chua},
+      year={2025},
+      eprint={2506.18254},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2506.18254}, 
 }
 ```
