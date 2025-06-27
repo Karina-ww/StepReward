@@ -6,7 +6,7 @@
 
 <div align="center" style="font-size: 15pt">
 
-<a href='https://arxiv.org'><img src='https://img.shields.io/badge/Paper-PDF-purple'></a>
+<a href='https://arxiv.org/abs/2506.18254'><img src='https://img.shields.io/badge/Paper-PDF-purple'></a>
 <a href='https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset'><img src='https://img.shields.io/badge/Dataset-Train-Green'></a>
 <a href='https://huggingface.co/collections/openbmb/rlpr-6857fa5d22cbe64327a3f8f6'><img src='https://img.shields.io/badge/Model-Qwen_Llama_Gemma-orange'></a>
 
@@ -20,7 +20,7 @@
 
 ## 🎊 更新日志 <!-- omit in toc -->
 
-- [2025.06.23] 我们开源了 RLPR 的代码、[权重](https://huggingface.co/openbmb/RLPR-Qwen2.5-7B-Base)和[数据](https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset)！
+- [2025.06.23] 我们开源了 RLPR 的代码、[权重](https://huggingface.co/openbmb/RLPR-Qwen2.5-7B-Base)、[数据](https://huggingface.co/datasets/openbmb/RLPR-Train-Dataset)和[论文](https://arxiv.org/abs/2506.18254)！
 
 ## 📜 简介 <!-- omit in toc -->
 
@@ -152,10 +152,13 @@
 如果您觉得我们的模型/代码/数据/论文有帮助，请给我们 ⭐ 和 引用 📝，感谢！
 
 ```bibtex
-@article{yu2025rlpr,
-  title={RLPR: Extrapolating RLVR to General Domains without Verifiers},
-  author={Yu, Tianyu and Ji, Bo and Wang, Shouli and Yao, Shu and Wang, Zefan and Cui, Ganqu and Yuan, Lifan and Ding, Ning and Yao, Yuan and Liu, Zhiyuan and Sun, Maosong and Chua, Tat-Seng},
-  journal={arXiv preprint arXiv:2506.xxxxx},
-  year={2025}
+@misc{yu2025rlprextrapolatingrlvrgeneral,
+      title={RLPR: Extrapolating RLVR to General Domains without Verifiers}, 
+      author={Tianyu Yu and Bo Ji and Shouli Wang and Shu Yao and Zefan Wang and Ganqu Cui and Lifan Yuan and Ning Ding and Yuan Yao and Zhiyuan Liu and Maosong Sun and Tat-Seng Chua},
+      year={2025},
+      eprint={2506.18254},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2506.18254}, 
 }
 ```
