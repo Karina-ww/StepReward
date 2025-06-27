@@ -1073,6 +1073,7 @@ class RayPPOTrainer(object):
                             # 'n': 1,
                             'n': n,
                             'seed': self.config.trainer.get('val_seed', 42),
+                            'top_p': self.config.actor_rollout_ref.rollout.get('val_top_p', self.config.actor_rollout_ref.rollout.top_p),
                         }
                     else:
                         raise ValueError
@@ -3043,22 +3044,6 @@ class RayPPOTrainer(object):
         print(f"{excel_path=}")
         df_excel.to_excel(excel_path, index=False, engine='xlsxwriter')
         
-    @staticmethod
-    def format_reward(predict_str: str) -> float:
-        def _validate_tags(input_string):
-            tags = ['<think>', '</think>', '<answer>', '</answer>']
-            for tag in tags:
-                if input_string.count(tag) != 1:
-                    return 0.0
-            return 1.0
-
-        if _validate_tags(predict_str) == 0.0:
-            return 0.0
-        pattern = re.compile(r'<think>.*</think>.*<answer>.*</answer>.*', re.DOTALL)
-        match_result = re.fullmatch(pattern, predict_str)
-
-        return 1.0 if match_result else 0.0
-
     def compute_think_answer_length_metrics(self, batch) -> Dict[str, float]:
         """
         Compute token length statistics for text within <think> and <answer> tags.
@@ -3077,8 +3062,12 @@ class RayPPOTrainer(object):
         think_lengths = []
         answer_lengths = []
         
-        # pattern = re.compile(r'.*<think>(.*)</think>.*<answer>(.*)</answer>.*', re.DOTALL)
-        pattern = re.compile(r'(.*)<answer>(.*)</answer>.*', re.DOTALL)
+        if self.config.reward_model.get('format_mode', 'R1') == 'R1':
+            pattern = re.compile(r'.*<think>(.*)</think>.*<answer>(.*)</answer>.*', re.DOTALL)
+        elif self.config.reward_model.get('format_mode', 'R1') == 'R1_nothink':
+            pattern = re.compile(r'(.*)<answer>(.*)</answer>.*', re.DOTALL)
+        else:
+            raise ValueError
         
         for text in output_texts:
             match = pattern.fullmatch(text)

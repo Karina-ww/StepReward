@@ -99,7 +99,6 @@ python -m verl.trainer.main_ppo \
     +data.accuracy_upper_bound=1000000 \
     +data.filter_cache_regenerate=True \
     actor_rollout_ref.rollout.temperature=0.6 \
-    actor_rollout_ref.rollout.top_p=0.95 \
     actor_rollout_ref.model.path=$MODEL \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
@@ -116,6 +115,7 @@ python -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.n=8 \
+    +actor_rollout_ref.rollout.val_top_p=0.95 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     +actor_rollout_ref.actor.clip_ratio_low=0.2 \
     +actor_rollout_ref.actor.clip_ratio_high=0.27 \
@@ -136,8 +136,6 @@ python -m verl.trainer.main_ppo \
     reward_model.reward_manager=prob \
     +reward_model.reward_manager_shaping_function_name=threshold_0 \
     +reward_model.compute_score_name=mean_exp_log_softmax \
-    +reward_model.version=v2.1 \
-    +reward_model.optimize_think_only=False \
     +reward_model.repetition_penalty=True \
     +reward_model.val_reward_manager=naive \
     +reward_model.format_mode=R1_nothink \
