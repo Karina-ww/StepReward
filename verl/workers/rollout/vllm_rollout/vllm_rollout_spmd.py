@@ -177,7 +177,7 @@ class vLLMRollout(BaseRollout):
                 'n': 1  # if greedy, only 1 response
             }
         if prompts.meta_info.get('validate', False):
-            kwargs.update({'n': prompts.meta_info.get('n', 1),'seed': prompts.meta_info.get('seed', 42)})
+            kwargs.update({'n': prompts.meta_info.get('n', 1),'seed': prompts.meta_info.get('seed', 42), 'top_p': prompts.meta_info.get('top_p', 1.0)})
 
 
         # users can customize different sampling_params at different run
