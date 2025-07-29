@@ -136,6 +136,14 @@
     # bash examples/RLPR/reproduce_gemma.sh +trainer.val_only=True
     ```
 
+
+### 将 Checkpoints 转换为 HuggingFace 格式的模型
+运行下面的脚本：
+```shell
+python scripts/model_merger.py --local_dir <checkpoint_folder>/<exp_name>/global_step_<step>/actor --target_dir <target_dir>
+```
+
+
 ## 许可证 <!-- omit in toc -->
 
 [![代码许可证](https://img.shields.io/badge/Code%20License-Apache_2.0-green.svg)](https://github.com/tatsu-lab/stanford_alpaca/blob/main/LICENSE)
