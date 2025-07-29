@@ -140,6 +140,14 @@ bash examples/RLPR/reproduce_qwen.sh +trainer.val_only=True
 # bash examples/RLPR/reproduce_gemma.sh +trainer.val_only=True
 ```
 
+### Convert checkpoints to HuggingFace format model
+
+Run the code below:
+```shell
+python scripts/model_merger.py --local_dir <checkpoint_folder>/<exp_name>/global_step_<step>/actor --target_dir <target_dir>
+```
+
+
 ## Licenses <!-- omit in toc -->
 
 
