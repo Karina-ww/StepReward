@@ -153,18 +153,18 @@ def compute_grpo_outcome_advantage(token_level_rewards: torch.Tensor,
             else:
                 raise ValueError(f"no score in prompt index: {idx}")
         for i in range(bsz):
-            if id2std[index[i]] < std_filter: # avoid the case when all scores are very close
-                filtered_count += 1
-                scores[i] = 0
-            else:
-                scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
-            stds[i] = id2std[index[i]]
+            # if id2std[index[i]] < std_filter: # avoid the case when all scores are very close
+            #     filtered_count += 1
+            #     scores[i] = 0
+            # else:
+            scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
+            # stds[i] = id2std[index[i]]
         scores = scores.unsqueeze(-1).tile([1, response_length]) * eos_mask
 
         # Calculate filter rate
-        filter_rate = filtered_count / bsz
+        # filter_rate = filtered_count / bsz
 
-    return scores, scores, filter_rate, stds
+    return scores, scores
 
 def get_reward_mean_and_std(id2score: Dict[str, torch.Tensor]) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
     id2mean = {}

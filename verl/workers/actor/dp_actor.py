@@ -311,6 +311,7 @@ class DataParallelPPOActor(BasePPOActor):
             with torch.no_grad():
                 # _, log_probs = self._forward_micro_batch(micro_batch, temperature=temperature)
                 entropy, log_probs = self._forward_micro_batch(micro_batch, temperature=temperature)
+                print("=====log_probs===", log_probs)
             entropy_lst.append(entropy)
             log_probs_lst.append(log_probs)
         log_probs = torch.concat(log_probs_lst, dim=0)

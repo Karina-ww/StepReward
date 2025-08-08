@@ -14,7 +14,7 @@
 """
 The main entry point to run the PPO algorithm
 """
-
+import psutil
 import logging
 import os
 import warnings
@@ -397,11 +397,11 @@ class ActorRolloutRefWorker(Worker):
                                                             lr_scheduler=self.actor_lr_scheduler,
                                                             tokenizer=self.tokenizer)
 
-        torch.cuda.empty_cache() # remove 1
-
+        # # torch.cuda.empty_cache() # remove 1
     @register(dispatch_mode=Dispatch.DP_COMPUTE_PROTO)
-    def update_actor(self, data: DataProto, mode='normal'): # , tokenizer_debug=None):
-        data = data.to('cuda')
+    def update_actor(self, data: DataProto):
+        # Support all hardwares
+        data = data.to(torch.cuda.current_device())
 
         assert self._is_actor
         if self._is_offload_param:
@@ -409,42 +409,36 @@ class ActorRolloutRefWorker(Worker):
         if self._is_offload_optimizer:
             load_fsdp_optimizer(optimizer=self.actor_optimizer, device_id=torch.cuda.current_device())
 
-        data.batch = data.batch.cuda()
-
-        if mode == 'normal':
-            log_gpu_memory_usage('Before update policy', logger=logger)
-
         with self.ulysses_sharding_manager:
-            # print(f"Before preprocessing data in self.ulysses_sharding_manager: {data=}")
             data = self.ulysses_sharding_manager.preprocess_data(data=data)
-            # print(f"After preprocessing data in self.ulysses_sharding_manager: {data=}")
             # perform training
-            with Timer(name='update_policy', logger=None) as timer:
-                metrics = self.actor.update_policy(data=data, mode=mode) #, tokenizer_debug=tokenizer_debug)
+            with Timer(name="update_policy", logger=None) as timer:
+                metrics = self.actor.update_policy(data=data)
+            delta_time = timer.last
+            global_num_tokens = data.meta_info["global_token_num"]
+            estimated_flops, promised_flops = self.flops_counter.estimate_flops(global_num_tokens, delta_time)
+            metrics["perf/mfu/actor"] = (
+                estimated_flops * self.config.actor.ppo_epochs / promised_flops / self.world_size
+            )
+            metrics["perf/max_memory_allocated_gb"] = torch.cuda.max_memory_allocated() / (1024**3)
+            metrics["perf/max_memory_reserved_gb"] = torch.cuda.max_memory_reserved() / (1024**3)
+            metrics["perf/cpu_memory_used_gb"] = psutil.virtual_memory().used / (1024**3)
 
-            if mode == 'normal':
-                delta_time = timer.last
-                global_num_tokens = data.meta_info['global_token_num']
-                estimated_flops, promised_flops = self.flops_counter.estimate_flops(global_num_tokens, delta_time)
-                metrics['mfu/actor'] = estimated_flops * self.config.actor.ppo_epochs / promised_flops / self.world_size
-
-                self.actor_lr_scheduler.step()
-                lr = self.actor_lr_scheduler.get_last_lr()[0]
-                metrics['actor/lr'] = lr
-
-                log_gpu_memory_usage('After update policy', logger=logger)
+            self.actor_lr_scheduler.step()
+            lr = self.actor_lr_scheduler.get_last_lr()[0]
+            metrics["actor/lr"] = lr
 
             # TODO: here, we should return all metrics
-            output = DataProto(meta_info={'metrics': metrics})
+            output = DataProto(meta_info={"metrics": metrics})
 
             output = self.ulysses_sharding_manager.postprocess_data(data=output)
-            output = output.to('cpu')
+            output = output.to("cpu")
 
         if self._is_offload_param:
             offload_fsdp_model_to_cpu(self.actor_module_fsdp)
         if self._is_offload_optimizer:
             offload_fsdp_optimizer(optimizer=self.actor_optimizer)
-        torch.cuda.empty_cache()
+
         return output
 
     @register(dispatch_mode=Dispatch.DP_COMPUTE_PROTO)
@@ -485,7 +479,7 @@ class ActorRolloutRefWorker(Worker):
         output = output.to('cpu')
 
         # clear kv cache
-        torch.cuda.empty_cache() # remove 1
+        # torch.cuda.empty_cache() # remove 1
         log_gpu_memory_usage('After recompute log prob', logger=logger)
         return output
 
@@ -519,7 +513,7 @@ class ActorRolloutRefWorker(Worker):
             offload_fsdp_model_to_cpu(self.actor_module_fsdp)
 
         # clear kv cache
-        torch.cuda.empty_cache() # remove 1
+        # # torch.cuda.empty_cache() # remove 1
         log_gpu_memory_usage('After compute_log_prob', logger=logger)
         return output
 
@@ -553,7 +547,7 @@ class ActorRolloutRefWorker(Worker):
             offload_fsdp_model_to_cpu(self.actor_module_fsdp)
 
         # clear kv cache
-        torch.cuda.empty_cache() # remove 1
+        # torch.cuda.empty_cache() # remove 1
         log_gpu_memory_usage('After compute_log_prob_pr', logger=logger)
         return output
  
@@ -616,7 +610,7 @@ class ActorRolloutRefWorker(Worker):
         if self.world_size > 1:
             self.ref_policy.actor_module._handle.reshard(True)
 
-        torch.cuda.empty_cache() # remove 1
+        # torch.cuda.empty_cache() # remove 1
         return output
 
     @register(dispatch_mode=Dispatch.ONE_TO_ALL)
@@ -829,7 +823,7 @@ class CriticWorker(Worker):
                                                         lr_scheduler=self.critic_lr_scheduler,
                                                         tokenizer=self.tokenizer)
 
-        torch.cuda.empty_cache() # remove 1
+        # torch.cuda.empty_cache() # remove 1
 
     @register(dispatch_mode=Dispatch.DP_COMPUTE_PROTO)
     def compute_values(self, data: DataProto):

@@ -1,37 +1,20 @@
 set -x
-
+export CUDA_VISIBLE_DEVICES=0,2
 # --- Control WandB Usage ---
 # Set USE_WANDB to "false" to disable WandB logging.
-USE_WANDB=${USE_WANDB:-"false"}
-
+USE_WANDB=${USE_WANDB:-"true"} 
+# export WANDB_API_KEY=172614de20afbb200fe57037cb2e021fb4b89c60
+export SWANLAB_API_KEY=yhi3xknn95gSG0YNc7d84
 # Basic Project Settings
 WANDB_PRJ_NAME=rlpr
-EXP_NAME=reproduce_qwen
-MODEL=path_to_base_model
-N_GPUS_PER_NODE=8
-
-# Judge Settings
-# You can choose one of the following options:
-
-# Rule as Judge (Default)
-unset OPENAI_API_KEY
-unset OPENAI_API_BASE
-export USED_MODEL=${USED_MODEL:-"no_api"}
-
-# # OpenSouce Model as Judge
-# export USED_MODEL=Qwen/Qwen2.5-72B-Instruct
-# export CLIENT_IP=http://127.0.0.1:8001
-
-# # API-Based Model as Judge
-# export OPENAI_API_KEY=your_openai_api_key
-# export OPENAI_API_BASE=your_openai_api_base
-# export USED_MODEL=gpt-4.1 # or gpt-4o
-
+EXP_NAME=RLPR-qwen
+MODEL=/data/work_backup/jingyiwang/models/Qwen2.5-Math-1.5B-Instruct
+N_GPUS_PER_NODE=2
 
 # Train and Validation Files
-TRAIN_FILES=./datasets/train/rlpr_train.parquet
+TRAIN_FILES=/data/work_backup/jingyiwang/RLPR/datasets/decomposed/math/train_sample_500.parquet
 VAL_DIR=${VAL_DIR:-"./datasets/test"}
-VAL_FILES=[${VAL_DIR}'/MMLUPro-1000_Avg2.parquet',${VAL_DIR}'/Math-500_Avg2.parquet',${VAL_DIR}'/gpqa_diamond_Avg4.parquet',${VAL_DIR}'/AIME2024_Avg16.parquet',${VAL_DIR}'/WebInstruct-verified-val_Avg2.parquet',${VAL_DIR}'/Minerva_Avg4.parquet',${VAL_DIR}'/TheoremQA_Avg2.parquet']
+VAL_FILES=['/data/work_backup/jingyiwang/RLPR/datasets/decomposed/math/test.parquet','/data/work_backup/jingyiwang/RLPR/datasets/decomposed/amc23/test.parquet',${VAL_DIR}'/gpqa_diamond_Avg4.parquet',${VAL_DIR}'/AIME2024_Avg16.parquet','/data/work_backup/jingyiwang/RLPR/datasets/decomposed/aime2025/test.parquet']
 
 # Logging and Checkpointing
 export LOGS_PATH=data/logs
@@ -54,7 +37,7 @@ if [ "$USE_WANDB" = "true" ]; then
 
     export WANDB_DIR=${WANDB_DIR_PATH}
 
-    TRAINER_LOGGER_CONFIG="['console','wandb']"
+    TRAINER_LOGGER_CONFIG="['console','swanlab']"
     WANDB_PARAMETERS=(
         "trainer.project_name=$WANDB_PRJ_NAME"
         "trainer.val_generations_to_log_to_wandb=10"
@@ -84,9 +67,9 @@ python -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
-    data.train_batch_size=768 \
-    data.max_prompt_length=2048 \
-    data.max_response_length=3072 \
+    data.train_batch_size=4 \
+    data.max_prompt_length=512 \
+    data.max_response_length=768 \
     +data.filter_accuracy=True \
     +data.filter_truncated=False \
     +data.filter_ema_ratio=0.99 \
@@ -101,28 +84,32 @@ python -m verl.trainer.main_ppo \
     actor_rollout_ref.model.path=$MODEL \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
-    actor_rollout_ref.actor.ppo_mini_batch_size=192 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=4 \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
     actor_rollout_ref.actor.ppo_max_token_len_per_gpu=24000 \
     actor_rollout_ref.actor.use_kl_loss=True \
     actor_rollout_ref.actor.kl_loss_coef=$KL_COEF \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
-    actor_rollout_ref.actor.fsdp_config.param_offload=False \
-    actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
+    actor_rollout_ref.actor.fsdp_config.param_offload=True \
+    actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
     actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
-    actor_rollout_ref.rollout.n=8 \
+    actor_rollout_ref.rollout.n=2 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     +actor_rollout_ref.actor.clip_ratio_low=0.2 \
     +actor_rollout_ref.actor.clip_ratio_high=0.27 \
     algorithm.kl_ctrl.kl_coef=$KL_COEF \
+    +algorithm.use_step_prob_reward=true \
+    +algorithm.step_prob_reward_k=3 \
+    +algorithm.step_prob_reward_min_gap=50 \
+    +algorithm.step_prob_reward_assign_mode=segment_last_token \
     trainer.critic_warmup=0 \
     trainer.logger=${TRAINER_LOGGER_CONFIG} \
     trainer.experiment_name=$EXP_NAME \
     "${WANDB_PARAMETERS[@]}" \
-    +trainer.val_before_train=True \
+    +trainer.val_before_train=False \
     trainer.n_gpus_per_node=${N_GPUS_PER_NODE} \
     trainer.nnodes=$nnodes \
     trainer.save_freq=40 \
@@ -131,10 +118,10 @@ python -m verl.trainer.main_ppo \
     trainer.total_epochs=100 \
     +trainer.val_save_results_dir=${VAL_SAVE_RESULTS_DIR} \
     trainer.default_local_dir=${LOCAL_DIR} \
-    reward_model.reward_manager=prob \
+    reward_model.reward_manager=naive \
     +reward_model.reward_manager_shaping_function_name=threshold_0 \
     +reward_model.compute_score_name=mean_exp_log_softmax \
     +reward_model.repetition_penalty=True \
     +reward_model.val_reward_manager=naive \
-    +reward_model.format_mode=R1 \
+    +reward_model.format_mode=R1_nothink \
     "$@"

@@ -3,6 +3,7 @@ data:
   train_files: ~/data/rlhf/gsm8k/train.parquet
   val_files: ~/data/rlhf/gsm8k/test.parquet
   prompt_key: prompt
+  reward_fn_key: data_source
   max_prompt_length: 512
   max_response_length: 512
   train_batch_size: 1024
@@ -28,6 +29,7 @@ actor_rollout_ref:
     ppo_max_token_len_per_gpu: 16384 # n * ${data.max_prompt_length} + ${data.max_response_length}
     grad_clip: 1.0
     clip_ratio: 0.2
+    loss_agg_mode: "token-mean" # / "seq-mean-token-sum" / "seq-mean-token-mean"
     entropy_coeff: 0.001
     use_kl_loss: False # True for GRPO
     kl_loss_coef: 0.001 # for grpo
@@ -86,6 +88,14 @@ actor_rollout_ref:
     do_sample: True
     # number of responses (i.e. num sample times)
     n: 1 # > 1 for grpo
+    val_kwargs:
+      # sampling parameters for validation
+      top_k: -1 # 0 for hf rollout, -1 for vllm rollout
+      top_p: 1.0
+      temperature: 0
+      n: 1
+      do_sample: False # default eager for validation
+
 
 critic:
   strategy: fsdp
@@ -153,6 +163,7 @@ algorithm:
     kl_coef: 0.001
 
 trainer:
+  balance_batch: True
   total_epochs: 30
   total_training_steps: null
   project_name: verl_examples
