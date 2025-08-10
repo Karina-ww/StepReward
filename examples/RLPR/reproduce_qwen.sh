@@ -1,8 +1,8 @@
 set -x
-export CUDA_VISIBLE_DEVICES=0,2
+export CUDA_VISIBLE_DEVICES=2,3
 # --- Control WandB Usage ---
 # Set USE_WANDB to "false" to disable WandB logging.
-USE_WANDB=${USE_WANDB:-"true"} 
+USE_WANDB=${USE_WANDB:-"false"} 
 # export WANDB_API_KEY=172614de20afbb200fe57037cb2e021fb4b89c60
 export SWANLAB_API_KEY=yhi3xknn95gSG0YNc7d84
 # Basic Project Settings
@@ -12,9 +12,9 @@ MODEL=/data/work_backup/jingyiwang/models/Qwen2.5-Math-1.5B-Instruct
 N_GPUS_PER_NODE=2
 
 # Train and Validation Files
-TRAIN_FILES=/data/work_backup/jingyiwang/RLPR/datasets/decomposed/math/train_sample_500.parquet
+TRAIN_FILES=/data/work_backup/jingyiwang/StepReward/datasets/decomposed/math/train_sample_500.parquet
 VAL_DIR=${VAL_DIR:-"./datasets/test"}
-VAL_FILES=['/data/work_backup/jingyiwang/RLPR/datasets/decomposed/math/test.parquet','/data/work_backup/jingyiwang/RLPR/datasets/decomposed/amc23/test.parquet',${VAL_DIR}'/gpqa_diamond_Avg4.parquet',${VAL_DIR}'/AIME2024_Avg16.parquet','/data/work_backup/jingyiwang/RLPR/datasets/decomposed/aime2025/test.parquet']
+VAL_FILES=['/data/work_backup/jingyiwang/StepReward/datasets/decomposed/math/test.parquet','/data/work_backup/jingyiwang/StepReward/datasets/decomposed/amc23/test.parquet','/data/work_backup/jingyiwang/StepReward/datasets/decomposed/aime2025/test.parquet']
 
 # Logging and Checkpointing
 export LOGS_PATH=data/logs
@@ -64,19 +64,14 @@ KL_COEF=0
 
 # Main Training Command and Configuration
 python -m verl.trainer.main_ppo \
-    algorithm.adv_estimator=grpo \
+    algorithm.adv_estimator=gae_step \
+    algorithm.lam=0.95 \
+    algorithm.gamma=1 \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=4 \
-    data.max_prompt_length=512 \
+    data.max_prompt_length=1024 \
     data.max_response_length=768 \
-    +data.filter_accuracy=True \
-    +data.filter_truncated=False \
-    +data.filter_ema_ratio=0.99 \
-    +data.filter_ema_start_step=6 \
-    +data.filter_start_step=11 \
-    +data.filter_mode=EMA \
-    +data.filter_target=final_reward_std \
     +data.accuracy_lower_bound=0 \
     +data.std_filter_beta=0.5 \
     +data.accuracy_upper_bound=1000000 \
@@ -112,8 +107,8 @@ python -m verl.trainer.main_ppo \
     +trainer.val_before_train=False \
     trainer.n_gpus_per_node=${N_GPUS_PER_NODE} \
     trainer.nnodes=$nnodes \
-    trainer.save_freq=40 \
-    trainer.test_freq=40 \
+    trainer.save_freq=1 \
+    trainer.test_freq=1 \
     +trainer.test_decoding_strategy=sampling \
     trainer.total_epochs=100 \
     +trainer.val_save_results_dir=${VAL_SAVE_RESULTS_DIR} \

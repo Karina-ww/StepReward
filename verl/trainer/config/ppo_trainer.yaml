@@ -155,7 +155,7 @@ reward_model:
 
 algorithm:
   gamma: 1.0
-  lam: 1.0
+  lam: 0.95
   adv_estimator: gae
   kl_penalty: kl  # how to estimate kl divergence
   kl_ctrl:

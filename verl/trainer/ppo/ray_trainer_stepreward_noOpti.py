@@ -82,7 +82,6 @@ class AdvantageEstimator(str, Enum):
     """
 
     GAE = "gae"
-    GAE_STEP = "gae_step"
     GRPO = "grpo"
     REINFORCE_PLUS_PLUS = "reinforce_plus_plus"
     REINFORCE_PLUS_PLUS_BASELINE = "reinforce_plus_plus_baseline"
@@ -192,23 +191,13 @@ def compute_response_mask(data: DataProto):
     return attention_mask[:, -response_length:]
 
 
-def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=0.95, num_repeat=1, norm_adv_by_std_in_grpo=True, actor_rollout_wg=None):
+def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_repeat=1, norm_adv_by_std_in_grpo=True, actor_rollout_wg=None):
     # Back-compatible with trainers that do not compute response mask in fit
     if "response_mask" not in data.batch.keys():
         data.batch["response_mask"] = compute_response_mask(data)
     # prepare response group
     # TODO: add other ways to estimate advantages
     if adv_estimator == AdvantageEstimator.GAE:
-        advantages, returns = core_algos.compute_gae_advantage_return(
-            token_level_rewards=data.batch["token_level_rewards"],
-            values=data.batch["values"],
-            eos_mask=data.batch["response_mask"],
-            gamma=gamma,
-            lam=lam,
-        )
-        data.batch["advantages"] = advantages
-        data.batch["returns"] = returns
-    elif adv_estimator == AdvantageEstimator.GAE_STEP:
         advantages, returns = core_algos.compute_gae_advantage_return(
             token_level_rewards=data.batch["token_level_rewards"],
             values=data.batch["values"],
@@ -347,7 +336,6 @@ class RayPPOTrainer:
             AdvantageEstimator.REINFORCE_PLUS_PLUS_BASELINE,
             AdvantageEstimator.OPO,
             AdvantageEstimator.GPO,
-            AdvantageEstimator.GAE_STEP,
         ]:
             self.use_critic = False
         else:
@@ -585,7 +573,7 @@ class RayPPOTrainer:
     def _maybe_log_val_generations(self, inputs, outputs, scores):
         """Log a table of validation samples to the configured logger (wandb or swanlab)"""
 
-        generations_to_log = 10
+        generations_to_log = self.config.trainer.log_val_generations
 
         if generations_to_log == 0:
             return
@@ -614,65 +602,65 @@ class RayPPOTrainer:
         sample_inputs = []
         sample_outputs = []
         sample_scores = []
-        for idx, val_dataloader in enumerate(self.val_dataloaders):
-            for test_data in val_dataloader:
-                test_batch = DataProto.from_single_dict(test_data) # RZ: The validation dataset has only one batch.
 
-                # repeat test batch
-                test_batch = test_batch.repeat(
-                    repeat_times=self.config.actor_rollout_ref.rollout.val_kwargs.n, interleave=True
-                )
+        for test_data in self.val_dataloader:
+            test_batch = DataProto.from_single_dict(test_data) # RZ: The validation dataset has only one batch.
 
-                # we only do validation on rule-based rm
-                if self.config.reward_model.enable and test_batch[0].non_tensor_batch["reward_model"]["style"] == "model":
-                    return {}
+            # repeat test batch
+            test_batch = test_batch.repeat(
+                repeat_times=self.config.actor_rollout_ref.rollout.val_kwargs.n, interleave=True
+            )
 
-                # Store original inputs
-                input_ids = test_batch.batch["input_ids"] # RZ: tensor. shape = bsz * seq length.
-                # TODO: Can we keep special tokens except for padding tokens?
-                input_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in input_ids]
-                sample_inputs.extend(input_texts) 
+            # we only do validation on rule-based rm
+            if self.config.reward_model.enable and test_batch[0].non_tensor_batch["reward_model"]["style"] == "model":
+                return {}
 
-                test_gen_batch = test_batch.pop(
-                    batch_keys=["input_ids", "attention_mask", "position_ids"],
-                    non_tensor_batch_keys=["raw_prompt_ids"],
-                ) 
-                test_gen_batch.meta_info = {
-                    "eos_token_id": self.tokenizer.eos_token_id,
-                    "pad_token_id": self.tokenizer.pad_token_id,
-                    "recompute_log_prob": False,
-                    "do_sample": self.config.actor_rollout_ref.rollout.val_kwargs.do_sample,
-                    "validate": True,
-                }
-                print(f"test_gen_batch meta info: {test_gen_batch.meta_info}")
+            # Store original inputs
+            input_ids = test_batch.batch["input_ids"] # RZ: tensor. shape = bsz * seq length.
+            # TODO: Can we keep special tokens except for padding tokens?
+            input_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in input_ids]
+            sample_inputs.extend(input_texts) # RZ: A list of input texts.
 
-                # pad to be divisible by dp_size
-                test_gen_batch_padded, pad_size = pad_dataproto_to_divisor(test_gen_batch, self.actor_rollout_wg.world_size)
-                test_output_gen_batch_padded = self.actor_rollout_wg.generate_sequences(test_gen_batch_padded) 
+            test_gen_batch = test_batch.pop(
+                batch_keys=["input_ids", "attention_mask", "position_ids"],
+                non_tensor_batch_keys=["raw_prompt_ids"],
+            ) 
+            test_gen_batch.meta_info = {
+                "eos_token_id": self.tokenizer.eos_token_id,
+                "pad_token_id": self.tokenizer.pad_token_id,
+                "recompute_log_prob": False,
+                "do_sample": self.config.actor_rollout_ref.rollout.val_kwargs.do_sample,
+                "validate": True,
+            }
+            print(f"test_gen_batch meta info: {test_gen_batch.meta_info}")
 
-                # unpad
-                test_output_gen_batch = unpad_dataproto(test_output_gen_batch_padded, pad_size=pad_size)
-                print("validation generation end")
+            # pad to be divisible by dp_size
+            test_gen_batch_padded, pad_size = pad_dataproto_to_divisor(test_gen_batch, self.actor_rollout_wg.world_size)
+            test_output_gen_batch_padded = self.actor_rollout_wg.generate_sequences(test_gen_batch_padded) # RZ: DataProto.
 
-                # Store generated outputs
-                output_ids = test_output_gen_batch.batch["responses"]
-                output_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in output_ids]
-                sample_outputs.extend(output_texts)
+            # unpad
+            test_output_gen_batch = unpad_dataproto(test_output_gen_batch_padded, pad_size=pad_size)
+            print("validation generation end")
 
-                test_batch = test_batch.union(test_output_gen_batch)
+            # Store generated outputs
+            output_ids = test_output_gen_batch.batch["responses"]
+            output_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in output_ids] # RZ: A list of string.
+            sample_outputs.extend(output_texts)
 
-                # evaluate using reward_function
-                result = self.val_reward_fn(test_batch, return_dict=True) # RZ: If we use default reward fuxtion for DAPO or AIME, the reward is the rule-based reward + length penalty.
-                reward_tensor = result["reward_tensor"] # RZ: tensor. Shape = bsz * response's length.
-                scores = reward_tensor.sum(-1).cpu().tolist() # RZ: length = bsz. In AIME, we already repeat every question for 30 times so here is 960.
-                sample_scores.extend(scores)
+            test_batch = test_batch.union(test_output_gen_batch)
 
-                reward_extra_infos_dict["reward"].extend(scores)
-                if "reward_extra_info" in result:
-                    for key, lst in result["reward_extra_info"].items(): # RZ: keys = score, acc, pred
-                        reward_extra_infos_dict[key].extend(lst)
+            # evaluate using reward_function
+            result = self.val_reward_fn(test_batch, return_dict=True) # RZ: If we use default reward fuxtion for DAPO or AIME, the reward is the rule-based reward + length penalty.
+            reward_tensor = result["reward_tensor"] # RZ: tensor. Shape = bsz * response's length.
+            scores = reward_tensor.sum(-1).cpu().tolist() # RZ: length = bsz. In AIME, we already repeat every question for 30 times so here is 960.
+            sample_scores.extend(scores)
 
-                data_source_lst.append(test_batch.non_tensor_batch.get("data_source", ["unknown"] * reward_tensor.shape[0]))
+            reward_extra_infos_dict["reward"].extend(scores)
+            if "reward_extra_info" in result:
+                for key, lst in result["reward_extra_info"].items(): # RZ: keys = score, acc, pred
+                    reward_extra_infos_dict[key].extend(lst)
+
+            data_source_lst.append(test_batch.non_tensor_batch.get("data_source", ["unknown"] * reward_tensor.shape[0]))
 
         self._maybe_log_val_generations(inputs=sample_inputs, outputs=sample_outputs, scores=sample_scores)
 
@@ -780,35 +768,57 @@ class RayPPOTrainer:
 
     def _save_checkpoint(self):
         # path: given_path + `/global_step_{global_steps}` + `/actor`
-        local_global_step_folder = os.path.join(self.config.trainer.default_local_dir,
-                                                f'global_step_{self.global_steps}')
-        actor_local_path = os.path.join(local_global_step_folder, 'actor')
+        local_global_step_folder = os.path.join(
+            self.config.trainer.default_local_dir, f"global_step_{self.global_steps}"
+        )
 
-        actor_remote_path = None if self.config.trainer.default_hdfs_dir is None else os.path.join(
-            self.config.trainer.default_hdfs_dir, f'global_step_{self.global_steps}', 'actor')
-        self.actor_rollout_wg.save_checkpoint(actor_local_path,
-                                              actor_remote_path,
-                                              self.global_steps,
-                                              remove_previous_ckpt=self.config.trainer.remove_previous_ckpt_in_save)
+        print(f"local_global_step_folder: {local_global_step_folder}")
+        actor_local_path = os.path.join(local_global_step_folder, "actor")
+
+        actor_remote_path = (
+            None
+            if self.config.trainer.default_hdfs_dir is None
+            else os.path.join(self.config.trainer.default_hdfs_dir, f"global_step_{self.global_steps}", "actor")
+        )
+
+        remove_previous_ckpt_in_save = self.config.trainer.get("remove_previous_ckpt_in_save", False)
+        if remove_previous_ckpt_in_save:
+            print(
+                "Warning: remove_previous_ckpt_in_save is deprecated,"
+                + " set max_actor_ckpt_to_keep=1 and max_critic_ckpt_to_keep=1 instead"
+            )
+        max_actor_ckpt_to_keep = (
+            self.config.trainer.get("max_actor_ckpt_to_keep", None) if not remove_previous_ckpt_in_save else 1
+        )
+        max_critic_ckpt_to_keep = (
+            self.config.trainer.get("max_critic_ckpt_to_keep", None) if not remove_previous_ckpt_in_save else 1
+        )
+
+        self.actor_rollout_wg.save_checkpoint(
+            actor_local_path, actor_remote_path, self.global_steps, max_ckpt_to_keep=max_actor_ckpt_to_keep
+        )
 
         if self.use_critic:
-            critic_local_path = os.path.join(local_global_step_folder, 'critic')
-            critic_remote_path = None if self.config.trainer.default_hdfs_dir is None else os.path.join(
-                self.config.trainer.default_hdfs_dir, f'global_step_{self.global_steps}', 'critic')
-            self.critic_wg.save_checkpoint(critic_local_path,
-                                           critic_remote_path,
-                                           self.global_steps,
-                                           remove_previous_ckpt=self.config.trainer.remove_previous_ckpt_in_save)
+            critic_local_path = os.path.join(local_global_step_folder, "critic")
+            critic_remote_path = (
+                None
+                if self.config.trainer.default_hdfs_dir is None
+                else os.path.join(self.config.trainer.default_hdfs_dir, f"global_step_{self.global_steps}", "critic")
+            )
+            self.critic_wg.save_checkpoint(
+                critic_local_path, critic_remote_path, self.global_steps, max_ckpt_to_keep=max_critic_ckpt_to_keep
+            )
 
         # save dataloader
-        dataloader_local_path = os.path.join(local_global_step_folder, 'data.pt')
-        import dill
-        torch.save(self.train_dataloader, dataloader_local_path, pickle_module=dill)
+        dataloader_local_path = os.path.join(local_global_step_folder, "data.pt")
+        dataloader_state_dict = self.train_dataloader.state_dict()
+        torch.save(dataloader_state_dict, dataloader_local_path)
 
         # latest checkpointed iteration tracker (for atomic usage)
-        local_latest_checkpointed_iteration = os.path.join(self.config.trainer.default_local_dir,
-                                                           'latest_checkpointed_iteration.txt')
-        with open(local_latest_checkpointed_iteration, 'w') as f:
+        local_latest_checkpointed_iteration = os.path.join(
+            self.config.trainer.default_local_dir, "latest_checkpointed_iteration.txt"
+        )
+        with open(local_latest_checkpointed_iteration, "w") as f:
             f.write(str(self.global_steps))
 
     def _load_checkpoint(self):
@@ -970,8 +980,8 @@ class RayPPOTrainer:
                     # balance the number of valid tokens on each dp rank.
                     # Note that this breaks the order of data inside the batch.
                     # Please take care when you implement group based adv computation such as GRPO and rloo
-                    if self.config.trainer.balance_batch:
-                        self._balance_batch(batch, metrics=metrics)
+                    # if self.config.trainer.balance_batch:
+                    #     self._balance_batch(batch, metrics=metrics)
 
                     # compute global_valid tokens
                     batch.meta_info["global_token_num"] = torch.sum(batch.batch["attention_mask"], dim=-1).tolist()
@@ -991,7 +1001,9 @@ class RayPPOTrainer:
                         ########################
                         prompt_len = batch.batch['prompts'].size(1)
                         resp_len = batch.batch['responses'].size(1)
-
+                        # print(f"prompt_len:{prompt_len}, responses:{resp_len}")
+                        # print(batch.batch['prompts'].size(),batch.batch['responses'].size())
+                        # print(f"entropys:{entropys.size()}")
                         
                         ########################
                         old_log_prob.batch.pop("entropy")
@@ -1032,14 +1044,10 @@ class RayPPOTrainer:
                                 response_entropy=entropys,  # [B, R]
                                 k=k, min_gap=min_gap, assign_mode=assign_mode
                             )
-                            batch.batch["values"] = scores
 
-                            ### WWW:rule base reward ######
-                            reward_result = self.reward_fn(batch, return_dict=True)
-                            outcome_r = reward_result["reward_tensor"]
-                            extra = reward_result.get("reward_extra_info", {})
-                            batch.batch["token_level_scores"] = outcome_r 
-                            ### WWW:rule base reward ######
+                            #
+                            batch.batch["token_level_scores"] = scores
+
                     
                             if not self.config.actor_rollout_ref.actor.get('use_kl_loss', False):
                                 batch, kl_metrics = apply_kl_penalty(
@@ -1049,6 +1057,7 @@ class RayPPOTrainer:
                             else:
                                 batch.batch["token_level_rewards"] = batch.batch["token_level_scores"]
 
+                            
                             batch = compute_advantage(
                                 batch,
                                 adv_estimator=self.config.algorithm.adv_estimator,
@@ -1424,7 +1433,7 @@ class RayPPOTrainer:
                 scores[i, start:end] = r 
                 prev = end_idx + 1
         print("final scores", scores.size(), scores)
-        # breakpoint()
+        breakpoint()
         return scores
 
 
