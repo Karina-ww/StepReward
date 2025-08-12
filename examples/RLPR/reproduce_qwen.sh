@@ -1,21 +1,21 @@
 set -x
-export CUDA_VISIBLE_DEVICES=2,3
+# export CUDA_VISIBLE_DEVICES=4,5,6,7
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 # --- Control WandB Usage ---
 # Set USE_WANDB to "false" to disable WandB logging.
-USE_WANDB=${USE_WANDB:-"false"} 
+USE_WANDB=${USE_WANDB:-"true"} 
 # export WANDB_API_KEY=172614de20afbb200fe57037cb2e021fb4b89c60
 export SWANLAB_API_KEY=yhi3xknn95gSG0YNc7d84
 # Basic Project Settings
-WANDB_PRJ_NAME=rlpr
-EXP_NAME=RLPR-qwen
-MODEL=/data/work_backup/jingyiwang/models/Qwen2.5-Math-1.5B-Instruct
-N_GPUS_PER_NODE=2
+WANDB_PRJ_NAME=stepReward
+EXP_NAME=stepReward-qwen-7B-real
+MODEL=/data/wengtengjin/wtj_works/models/Qwen2.5-7B
+N_GPUS_PER_NODE=4
 
 # Train and Validation Files
-TRAIN_FILES=/data/work_backup/jingyiwang/StepReward/datasets/decomposed/math/train_sample_500.parquet
+TRAIN_FILES=/data/wengtengjin/wtj_works/StepReward/datasets/decomposed/math/train.parquet
 VAL_DIR=${VAL_DIR:-"./datasets/test"}
-VAL_FILES=['/data/work_backup/jingyiwang/StepReward/datasets/decomposed/math/test.parquet','/data/work_backup/jingyiwang/StepReward/datasets/decomposed/amc23/test.parquet','/data/work_backup/jingyiwang/StepReward/datasets/decomposed/aime2025/test.parquet']
-
+VAL_FILES=['/data/wengtengjin/wtj_works/StepReward/datasets/decomposed/math/test.parquet','/data/wengtengjin/wtj_works/StepReward/datasets/decomposed/aime2025/test.parquet','/data/wengtengjin/wtj_works/StepReward/datasets/decomposed/amc23/test.parquet']
 # Logging and Checkpointing
 export LOGS_PATH=data/logs
 export TENSORBOARD_DIR=./tensorboard
@@ -69,9 +69,9 @@ python -m verl.trainer.main_ppo \
     algorithm.gamma=1 \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
-    data.train_batch_size=4 \
+    data.train_batch_size=512 \
     data.max_prompt_length=1024 \
-    data.max_response_length=768 \
+    data.max_response_length=3072 \
     +data.accuracy_lower_bound=0 \
     +data.std_filter_beta=0.5 \
     +data.accuracy_upper_bound=1000000 \
@@ -79,7 +79,7 @@ python -m verl.trainer.main_ppo \
     actor_rollout_ref.model.path=$MODEL \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
-    actor_rollout_ref.actor.ppo_mini_batch_size=4 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=256 \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
     actor_rollout_ref.actor.ppo_max_token_len_per_gpu=24000 \
     actor_rollout_ref.actor.use_kl_loss=True \
@@ -91,7 +91,7 @@ python -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
-    actor_rollout_ref.rollout.n=2 \
+    actor_rollout_ref.rollout.n=4 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     +actor_rollout_ref.actor.clip_ratio_low=0.2 \
     +actor_rollout_ref.actor.clip_ratio_high=0.27 \
@@ -107,8 +107,8 @@ python -m verl.trainer.main_ppo \
     +trainer.val_before_train=False \
     trainer.n_gpus_per_node=${N_GPUS_PER_NODE} \
     trainer.nnodes=$nnodes \
-    trainer.save_freq=1 \
-    trainer.test_freq=1 \
+    trainer.save_freq=10 \
+    trainer.test_freq=5 \
     +trainer.test_decoding_strategy=sampling \
     trainer.total_epochs=100 \
     +trainer.val_save_results_dir=${VAL_SAVE_RESULTS_DIR} \
@@ -118,5 +118,5 @@ python -m verl.trainer.main_ppo \
     +reward_model.compute_score_name=mean_exp_log_softmax \
     +reward_model.repetition_penalty=True \
     +reward_model.val_reward_manager=naive \
-    +reward_model.format_mode=R1_nothink \
+    +reward_model.format_mode=R1_distill \
     "$@"

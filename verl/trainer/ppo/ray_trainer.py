@@ -209,7 +209,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=0.95, num_r
         data.batch["advantages"] = advantages
         data.batch["returns"] = returns
     elif adv_estimator == AdvantageEstimator.GAE_STEP:
-        advantages, returns = core_algos.compute_gae_advantage_return(
+        advantages, returns = core_algos.compute_gae_step_advantage_return(
             token_level_rewards=data.batch["token_level_rewards"],
             values=data.batch["values"],
             eos_mask=data.batch["response_mask"],
@@ -1020,10 +1020,11 @@ class RayPPOTrainer:
                             ground_truth_list = []
                             for rm in batch.non_tensor_batch['reward_model']:
                                 if 'ground_truth' in rm:
+                                    # print("DEBUG rm['ground_truth']:", rm['ground_truth'], type(rm['ground_truth']))
                                     ground_truth_list.append(str(rm['ground_truth']['target']))
                                 else:
                                     raise ValueError("No ground_truth")
-
+                            # breakpoint()
                             # 用上面 old_log_prob 段缓存的响应熵做切分
                             scores = self.compute_step_prob_rewards(
                                 batch=batch,
@@ -1039,6 +1040,8 @@ class RayPPOTrainer:
                             outcome_r = reward_result["reward_tensor"]
                             extra = reward_result.get("reward_extra_info", {})
                             batch.batch["token_level_scores"] = outcome_r 
+                            print("*** token_level_scores ***") 
+                            print(outcome_r.sum(dim=-1)[:100])
                             ### WWW:rule base reward ######
                     
                             if not self.config.actor_rollout_ref.actor.get('use_kl_loss', False):
@@ -1186,7 +1189,8 @@ class RayPPOTrainer:
         L = int(valid_len)
         if L <= 0 or k <= 0:
             return []
-
+        if L <= k: # WWW:处理报错特殊情况
+            return [0] * k
         k_eff = min(k, L)
         # 等间距段末锚点（含最后一个 L-1）
         anchors = [max(0, min(L - 1, round((j * L) / k_eff) - 1)) for j in range(1, k_eff + 1)]
@@ -1252,39 +1256,7 @@ class RayPPOTrainer:
             if len(uniq) == 0 or x > uniq[-1]:
                 uniq.append(x)
         return uniq
-        
-    def _pick_topk_peaks_with_gap(self,
-                                entropy_vec: torch.Tensor,
-                                valid_len: int,
-                                k: int,
-                                min_gap: int = 16) -> list[int]:
-        """
-        在 response 熵向量里挑前 k 个峰值，保持最小间隔，返回升序索引（以 response 局部索引计）。
-        额外保证最后一个切分点落在最后一个有效 token（便于覆盖到结尾）。
-        """
-        L = int(valid_len)
-        if L <= 0:
-            return [0]
-        scores = entropy_vec[:L].detach().cpu().tolist()
-        selected, suppressed = [], [False] * L
-
-        for _ in range(k):
-            best_score, best_idx = None, None
-            for i, s in enumerate(scores):
-                if not suppressed[i] and (best_score is None or s > best_score):
-                    best_score, best_idx = s, i
-            if best_idx is None:
-                break
-            selected.append(best_idx)
-            l = max(0, best_idx - min_gap)
-            r = min(L, best_idx + min_gap + 1)
-            for j in range(l, r):
-                suppressed[j] = True
-
-        # 确保覆盖最后一个 token
-        if len(selected) == 0 or selected[-1] != L - 1:
-            selected.append(L - 1)
-        return sorted(set(selected))
+    
 
     def _build_context_gt_batch(self,
                             gen_batch_output: DataProto,
@@ -1309,26 +1281,35 @@ class RayPPOTrainer:
         for i in range(B):
             prompt_ids = prompts_ids[i]
             resp_ids = responses_ids[i]
-            # 对于第 i 样本，它有 len(cut_counts[i]) 个前缀版本（含 0 前缀，对应 V0）
-            for c in cut_counts[i]:
-                c = int(c)
-                if c < 0:
-                    c = 0
-                elif c > R:
-                    c = R
+            if all(c == 0 for c in cut_counts[i]):
+                for _ in range(k + 1):
+                    resp_prefix = resp_ids.clone()
+                    input_ids = torch.cat([prompt_ids, resp_prefix], dim=0)
+                    
+                    merged_prompts.append(prompt_ids.clone())
+                    merged_responses.append(resp_prefix)
+                    gt_repeated.append(ground_truth_list[i])
+                    merged_input_ids.append(input_ids)
+            else:
+                for c in cut_counts[i]:
+                    c = int(c)
+                    if c < 0:
+                        c = 0
+                    elif c > R:
+                        c = R
 
-                # 取前缀并右补到 R
-                resp_prefix = resp_ids[:c]  # [c]
-                pad_right = R - resp_prefix.size(0)
-                if pad_right > 0:
-                    resp_prefix = F.pad(resp_prefix, (0, pad_right), value=pad_id)  # -> [R]
-                
-                input_ids = torch.cat([prompt_ids, resp_prefix], dim=0)
+                    # 取前缀并右补到 R
+                    resp_prefix = resp_ids[:c]  # [c]
+                    pad_right = R - resp_prefix.size(0)
+                    if pad_right > 0:
+                        resp_prefix = F.pad(resp_prefix, (0, pad_right), value=pad_id)  # -> [R]
+                    
+                    input_ids = torch.cat([prompt_ids, resp_prefix], dim=0)
 
-                merged_prompts.append(prompt_ids.clone())   # [P]
-                merged_responses.append(resp_prefix)        # [R]
-                gt_repeated.append(ground_truth_list[i])
-                merged_input_ids.append(input_ids)  
+                    merged_prompts.append(prompt_ids.clone())   # [P]
+                    merged_responses.append(resp_prefix)        # [R]
+                    gt_repeated.append(ground_truth_list[i])
+                    merged_input_ids.append(input_ids)  
 
         
         stub_batch = DataProto.from_single_dict({
@@ -1376,6 +1357,7 @@ class RayPPOTrainer:
         attn_resp  = gen_batch_output.batch['attention_mask'][:, -resp_len:]
         valid_lens = attn_resp.sum(-1).tolist()  # List[int], <= resp_len
 
+
         # 1) 选切点（以响应局部索引计），再转成“前缀 token 数”
         cut_counts: list[list[int]] = []
         for i in range(B):
@@ -1387,17 +1369,18 @@ class RayPPOTrainer:
                 prefer_near_anchor=True   
             )
             cut_counts.append([0] + [e + 1 for e in ends]) 
-        # print("====cut_counts====",cut_counts)
+        print("====cut_counts====",cut_counts)
         # 2) 构造 (B*(k+1)) 的 batch（每个样本包含 V0..Vk 的上下文）
+
         pr_batch = self._build_context_gt_batch(
             gen_batch_output=gen_batch_output,
             ground_truth_list=ground_truth_list,
             cut_counts=cut_counts
         )
-        # breakpoint() 
+        # print("**** pr_batch ****", pr_batch)
         # 3) 前向一次得到每条上下文的 GT token 对数概率均值 => V_j
         pr_old = self.actor_rollout_wg.compute_log_prob(pr_batch)
-        # breakpoint() 
+ 
         log_probs = pr_old.batch['old_log_probs'].to(device)        # [B*(k+1), L]
         gt_mask   = pr_batch.batch['ground_truth_mask'].to(device)  # [B*(k+1), R_mask]
         # V: [B*(k+1)]
@@ -1409,11 +1392,13 @@ class RayPPOTrainer:
             cnt = len(cut_counts[i])
             Vs.append(V[idx:idx+cnt].tolist())
             idx += cnt
-        print(f"*** STEP-Level Value:{Vs} ***")
+        print(f"*** STEP-Level Value:{Vs[:200]} ***")
         # 4) 回填 token-level scores 到原 batch.input_ids 对齐的二维张量 -->  WWW: token-level VALUE
         scores = torch.zeros_like(batch.batch['responses'], dtype=torch.float32, device=device)
         for i in range(B):
             # r_j = V_j - V_{j-1}, j = 1..k
+            if all(c == 0 for c in cut_counts[i]):
+                continue
             rs = [Vs[i][j] - Vs[i][j-1] for j in range(1, len(Vs[i]))]  # 长度 k
             seg_ends = [c - 1 for c in cut_counts[i][1:]]  # 响应局部索引
             prev = 0
@@ -1448,14 +1433,18 @@ class RayPPOTrainer:
         gen_response_texts = [replace_left_and_right_str(text, pad_token_str) for text in gen_response_texts]
 
         new_texts = []
-
+        all_new_responses = []
+        # total_ground_truth = []
         for i in range(batch_size):
             full_text = gen_texts[i]
             response_text = gen_response_texts[i].rstrip(eos_token_str)
             gt = ground_truth_batch[i].strip()
-            boxed_gt = f"\\boxed{{{gt}}}"
-
-            # 如果包含 \boxed{xxx}，替换内容为 GT
+            if len(gt) < 3:  
+                boxed_gt = f" \\boxed{{{ gt }}} "  
+            else:
+                boxed_gt = f"\\boxed{{{gt}}}"
+            # total_ground_truth.append({"raw_gt": gt, "boxed_gt": boxed_gt})
+            
 
             old_boxed, _ = extract_boxed_expr(response_text)
             if old_boxed:
@@ -1480,7 +1469,10 @@ class RayPPOTrainer:
             split_pos = full_text.rfind(assistant_tag) + len(assistant_tag)
             new_text = full_text[:split_pos] + new_response_text + eos_token_str
             new_texts.append(new_text)
+            all_new_responses.append(new_response_text)
 
+        # print("=== Ground Truth Samples ===")
+        # print(total_ground_truth)
         # --- Tokenize new_texts and build tensors ---
         batch_input_data = self.tokenizer(
             new_texts, return_tensors='pt', add_special_tokens=False,
@@ -1514,7 +1506,8 @@ class RayPPOTrainer:
         boxed_suffix = "}"
         suffix_ids = self.tokenizer.encode(boxed_suffix, add_special_tokens=False)
         suffix_len = len(suffix_ids)
-
+        bad_indices = []
+        bad_responses = []
         for i in range(batch_size):
             input_ids = batch_input_ids[i]
             attn_mask = batch_attention_mask[i]
@@ -1532,9 +1525,23 @@ class RayPPOTrainer:
             gt_end = boxed_end - suffix_len
 
            
-            # 验证GT位置的有效性
-            if gt_start > gt_end:
-                raise ValueError(f"GT position error in sample {i}: start ({gt_start}) > end ({gt_end})")
+            # # 验证GT位置的有效性
+            # if gt_start > gt_end:
+            #     raise ValueError(f"GT position error in sample {i}: start ({gt_start}) > end ({gt_end})")
+            if not pos_gt:
+                print(f"[WARN] Failed to locate ground truth box for sample {i}, masking as all zeros.")
+                bad_indices.append(i)
+                gt_start, gt_end = None, None
+            else:
+                boxed_start, boxed_end = pos_gt[0], pos_gt[-1]
+                gt_start = boxed_start + prefix_len
+                gt_end = boxed_end - suffix_len
+
+                if gt_start > gt_end:
+                    print(f"[WARN] GT position error in sample {i}: start ({gt_start}) > end ({gt_end}), masking as all zeros.GT:{ground_truth_batch[i].strip()},{ground_truth_batch[i]}")
+                    bad_indices.append(i)
+                    bad_responses.append(all_new_responses[i])
+                    gt_start, gt_end = None, None
 
             prompts = input_ids[:pos_resp_tok]
             responses = input_ids[pos_resp_tok:]
@@ -1555,44 +1562,10 @@ class RayPPOTrainer:
 
             # 计算 ground_truth_mask（仅包含实际答案部分）
             ground_truth_mask = torch.zeros_like(responses)
-            gt_relative_start = gt_start - pos_resp_tok
-            gt_relative_end = gt_end - pos_resp_tok
-            # 确保不超出边界
-            gt_relative_start = max(0, gt_relative_start)
-            gt_relative_end = min(len(ground_truth_mask) - 1, gt_relative_end)
-            ground_truth_mask[gt_relative_start:gt_relative_end + 1] = 1
-
-            ##############debug########################
-            def clean_decoded(text):
-                """清理特殊符号，便于阅读"""
-                text = replace_left_and_right_str(text, pad_token_str)
-                text = text.replace(eos_token_str, "").strip()
-                return text
-
-            prompt_text = clean_decoded(self.tokenizer.decode(prompts, skip_special_tokens=False))
-            response_text = clean_decoded(self.tokenizer.decode(responses, skip_special_tokens=False))
-            full_text_decoded = clean_decoded(self.tokenizer.decode(full_input_ids, skip_special_tokens=False))
-            gt_mask_positions = torch.where(ground_truth_mask == 1)[0].tolist()
-            
-            # 获取当前样本的GT
-            current_gt = ground_truth_batch[i].strip()
-            # 解码GT对应的token
-            gt_tokens = input_ids[gt_start:gt_end+1]
-            gt_decoded = clean_decoded(self.tokenizer.decode(gt_tokens, skip_special_tokens=False))
-
-            # 打印最终结果（包含GT检查）
-            # print(f"\n===== 样本 {i} 最终结果 =====")
-            # print(f"\n【full_input_ids】(长度: {full_input_ids.shape[0]})\n{full_text_decoded}")
-            # print(f"【原始GT】: {current_gt}")
-            # print(f"【解码GT】: {gt_decoded}")
-            # print(f"【分割点验证】: response 从 token {pos_resp_tok} 开始")
-            # print(f"【完整boxed位置】: 绝对位置 {boxed_start}-{boxed_end} (包含\\boxed{{}})")
-            # print(f"【GT实际位置】: 绝对位置 {gt_start}-{gt_end} (仅答案部分)")
-            # print(f"【GT相对位置】: 相对 response 位置 {gt_relative_start}-{gt_relative_end}")
-            # print(f"【ground_truth_mask 有效位置】: {gt_mask_positions}")
-            # print(f"【attention_mask 有效长度】: {torch.sum(full_attention_mask).item()}")
-            # print("=====================================")
-            #############debug########################
+            if gt_start is not None and gt_end is not None:
+                gt_relative_start = max(0, gt_start - pos_resp_tok)
+                gt_relative_end = min(len(ground_truth_mask) - 1, gt_end - pos_resp_tok)
+                ground_truth_mask[gt_relative_start:gt_relative_end + 1] = 1
             # Append to result
             results[f'prompts{suffix}'].append(prompts)
             results[f'responses{suffix}'].append(responses)
@@ -1601,6 +1574,10 @@ class RayPPOTrainer:
             results[f'position_ids{suffix}'].append(position_ids)
             results[f'ground_truth_mask{suffix}'].append(ground_truth_mask)
 
+        if bad_indices:
+            print("\n=== Bad Indices and Corresponding Responses ===")
+            for idx, resp in zip(bad_indices, bad_responses):
+                print(f"Index {idx}:\nResponse: {resp}\n{'-'*50}")
         for k in results:
             results[k] = torch.stack(results[k])
         return results
